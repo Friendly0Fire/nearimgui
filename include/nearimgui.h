@@ -47,6 +47,9 @@ namespace NGui
         FormatArgs(const char* val)
             : value_(val) {}
 
+        FormatArgs(std::nullptr_t)
+            : value_(nullptr) {}
+
         const char* GetValue() const { return value_; }
     };
 
@@ -111,6 +114,31 @@ namespace NGui
         protected:
             using Base = Callable<T>;
         };
+
+        template<typename T>
+        constexpr ImGuiDataType GetDataType()
+        {
+            using Type = std::decay_t<T>;
+            static_assert(std::is_arithmetic_v<Type>);
+
+            if constexpr (std::is_integral_v<Type>)
+            {
+                constexpr bool isSigned = std::is_signed_v<Type>;
+                switch (sizeof(Type))
+                {
+                case 1:
+                    return isSigned ? ImGuiDataType_S8 : ImGuiDataType_U8;
+                case 2:
+                    return isSigned ? ImGuiDataType_S16 : ImGuiDataType_U16;
+                case 4:
+                    return isSigned ? ImGuiDataType_S32 : ImGuiDataType_U32;
+                case 8:
+                    return isSigned ? ImGuiDataType_S64 : ImGuiDataType_U64;
+                }
+            }
+            else if constexpr (std::is_floating_point_v<Type>)
+                return sizeof(Type) == 4 ? ImGuiDataType_Float : ImGuiDataType_Double;
+        }
     }
 
     static constexpr class AutoFitT
@@ -215,4 +243,25 @@ namespace NGui
             return ImGui::Button(fmt.GetValue(), size);
         }
     } Button;
+
+    static constexpr struct SliderT
+    {
+        struct Params
+        {
+            FormatArgs format = nullptr;
+            ImGuiSliderFlags_ flags = ImGuiSliderFlags_None;
+        };
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& value, const T& min, const T& max) const
+        {
+            return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max);
+        }
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& value, const T& min, const T& max, Params&& params) const
+        {
+            return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), params.flags);
+        }
+    } Slider;
 }
