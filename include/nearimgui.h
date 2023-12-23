@@ -2,6 +2,7 @@
 #include <imgui.h>
 #include <string_view>
 #include <format>
+#include <optional>
 
 namespace NGui
 {
@@ -185,31 +186,41 @@ namespace NGui
 
         struct Builder
         {
-            [[nodiscard]] Builder&& Position(const ImVec2& pos, ImGuiCond_ cond = ImGuiCond_Always, const ImVec2& pivot = { 0.f, 0.f })
+            [[nodiscard]] const auto& Position(const ImVec2& pos, ImGuiCond_ cond = ImGuiCond_Always, const ImVec2& pivot = { 0.f, 0.f }) const
             {
                 ImGui::SetNextWindowPos(pos, cond, pivot);
-                return std::move(*this);
+                return *this;
             }
 
-            [[nodiscard]] Builder&& Size(const ImVec2& size, ImGuiCond_ cond = ImGuiCond_Always)
+            [[nodiscard]] const auto& Size(const ImVec2& size, ImGuiCond_ cond = ImGuiCond_Always) const
             {
                 ImGui::SetNextWindowSize(size, cond);
-                return std::move(*this);
+                return *this;
             }
 
-            [[nodiscard]] Builder&& SizeConstraints(const ImVec2& sizeMin, const ImVec2& sizeMax)
+            [[nodiscard]] const auto& SizeConstraints(const ImVec2& sizeMin, const ImVec2& sizeMax) const
             {
                 ImGui::SetNextWindowSizeConstraints(sizeMin, sizeMax);
-                return std::move(*this);
+                return *this;
             }
 
-            [[nodiscard]] Builder&& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback)
+            [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
             {
-                ImGui::SetNextWindowSizeConstraints({}, {}, callback);
-                return std::move(*this);
+                if constexpr(std::convertible_to<decltype(callback), ImGuiSizeCallback>)
+                    ImGui::SetNextWindowSizeConstraints({}, {}, callback);
+
+                return *this;
             }
-        };
+
+            void Open(FormatArgs name, Params&& params, auto&& body) const;
+        } With;
+
     } Window;
+
+    void WindowT::Builder::Open(FormatArgs name, Params&& params, auto&& body) const
+    {
+        Window(name, std::move(params), std::forward<decltype(body)>(body));
+    }
 
     static constexpr class RegionT : public Detail::CallableBlock<RegionT>
     {
@@ -261,7 +272,51 @@ namespace NGui
         template<typename T>
         bool operator()(FormatArgs fmt, T& value, const T& min, const T& max, Params&& params) const
         {
-            return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), params.flags);
+            return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), Detail::Enum(params.flags));
+        }
+
+        bool Angle(FormatArgs fmt, float& value)
+        {
+            return ImGui::SliderAngle(fmt.GetValue(), &value);
+        }
+
+        struct AngleParams : Params
+        {
+            float min = -360.f;
+            float max = 360.f;
+        };
+
+        bool Angle(FormatArgs fmt, float& value, AngleParams&& params)
+        {
+            return ImGui::SliderAngle(fmt.GetValue(), &value, params.min, params.max, params.format.GetValue(), Detail::Enum(params.flags));
         }
     } Slider;
+
+    static constexpr struct DragT
+    {
+        template<typename T>
+        struct Params
+        {
+            float speed = 1.f;
+            std::optional<T> min = std::nullopt;
+            std::optional<T> max = std::nullopt;
+            FormatArgs format = nullptr;
+            ImGuiSliderFlags_ flags = ImGuiSliderFlags_None;
+        };
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& value) const
+        {
+            return ImGui::DragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value);
+        }
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& value, Params<T>&& params) const
+        {
+            return ImGui::DragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, params.speed,
+                params.min ? &*params.min : nullptr,
+                params.max ? &*params.max : nullptr,
+                params.format.GetValue(), params.flags);
+        }
+    } Drag;
 }
