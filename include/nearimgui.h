@@ -139,6 +139,8 @@ namespace NGui
             }
             else if constexpr (std::is_floating_point_v<Type>)
                 return sizeof(Type) == 4 ? ImGuiDataType_Float : ImGuiDataType_Double;
+            
+            return ImGuiDataType_COUNT;
         }
     }
 
@@ -317,6 +319,42 @@ namespace NGui
                 params.min ? &*params.min : nullptr,
                 params.max ? &*params.max : nullptr,
                 params.format.GetValue(), params.flags);
+        }
+
+        template<typename T>
+        struct ParamsRange : Params<T>
+        {
+            FormatArgs formatMax = nullptr;
+        };
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& minValue, T& maxValue, ParamsRange<T>&& params) const
+        {
+            using T2 = std::conditional_t<std::is_integral_v<T>, int, float>;
+            constexpr auto f = [](auto&& ...args) {
+                if constexpr (std::integral<T>)
+                    return ImGui::DragIntRange2(std::forward<decltype(args)>(args)...);
+                else if constexpr (std::floating_point<T>)
+                    return ImGui::DragFloatRange2(std::forward<decltype(args)>(args)...);
+                else
+                    return false;
+            };
+            T2 v1 = static_cast<T2>(minValue), v2 = static_cast<T2>(maxValue);
+            bool r = f(fmt.GetValue(), &v1, &v2, params.speed,
+                params.min ? *params.min : 0.f,
+                params.max ? *params.max : 0.f,
+                params.format.GetValue(),
+                params.formatMax.GetValue(), params.flags);
+            minValue = static_cast<T>(v1);
+            maxValue = static_cast<T>(v2);
+
+            return r;
+        }
+
+        template<typename T>
+        bool operator()(FormatArgs fmt, T& minValue, T& maxValue) const
+        {
+            return operator()(fmt, minValue, maxValue, ParamsRange<T>{});
         }
     } Drag;
 }
