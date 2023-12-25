@@ -8,30 +8,117 @@ namespace NGui
 {
     namespace Detail
     {
-        const char* ConvertString(std::string&& s)
-        {
-            thread_local std::string buf;
-            buf = s;
-            return buf.c_str();
-        }
+        const char* CacheString(std::string_view sv);
+        const char* CacheString(std::string&& s);
 
-        const char* ConvertString(const std::string& s)
+        inline const char* CacheString(const std::string& s)
         {
             return s.c_str();
         }
 
-        const char* ConvertString(std::string_view sv)
+        inline const char* CacheString(const char* s)
         {
-            thread_local std::string buf;
-            if (*(sv.data() + sv.size()) == '\0')
-                return sv.data();
-            else
-            {
-                buf.assign(sv);
-                return buf.c_str();
-            }
+            return s;
+        }
+
+        struct BaseCallback
+        {
+            BaseCallback(const BaseCallback&) = delete;
+            BaseCallback(BaseCallback&&) = delete;
+            virtual ~BaseCallback() = default;
+
+        protected:
+            BaseCallback() = default;
+        };
+
+        template<typename F>
+        struct Callback : BaseCallback
+        {
+            Callback(F&& cb) : callback(std::move(cb)) {}
+            ~Callback() override = default;
+
+            F callback;
+        };
+
+        template<typename C>
+        struct CallbackTraits {};
+
+        template<typename R, typename... Args>
+        struct CallbackTraits<R(*)(Args...)>
+        {
+            using ReturnValue = R;
+            using Arguments = std::tuple<Args...>;
+            static constexpr size_t ArgumentCount = sizeof...(Args);
+        };
+
+        template<typename T>
+        concept IsVoidPtr = std::same_as<std::remove_cvref_t<T>, void*>;
+
+        template<typename C>
+        concept IsDataPointerStyleCallback = requires(std::tuple_element_t<0, typename CallbackTraits<C>::Arguments> data) { { data->UserData } -> IsVoidPtr; };
+
+        template<typename C>
+        concept IsVoidPointerStyleCallback = IsVoidPtr<std::tuple_element_t<CallbackTraits<C>::ArgumentCount - 1, typename CallbackTraits<C>::Arguments>>;
+
+        BaseCallback* CacheCallback(std::unique_ptr<BaseCallback>&& callback);
+
+        /**
+         * Given a callable with no state and which can be implicitly converted to a function pointer, passes callback along unchanged and does not set the user data void pointer.
+         * @tparam C ImGui callback type to match.
+         * @tparam F Provided callable type.
+         * @param callback The callback.
+         * @return A pair containing the function pointer callback and the user data pointer (here, always null).
+        */
+        template<typename C, typename F>
+        requires std::convertible_to<F, C>
+        std::pair<C, void*> ThunkCallback(F&& callback)
+        {
+            return std::make_pair(callback, nullptr);
+        }
+
+        /**
+         * Given a callable which cannot be implictly converted to a function pointer, caches it and returns a thunk which wraps the call to it
+         * into a function pointer-convertible callback leveraging ImGui's user data pointer.
+         * This overload works on callbacks with a void* user_data as the last argument.
+         * @tparam C ImGui callback type to match.
+         * @tparam F Provided callable type.
+         * @param callback The callback.
+         * @return A pair containing the function pointer callback and the user data pointer storing the stateful callback.
+        */
+        template<typename C, typename F>
+        requires (!std::convertible_to<F, C>) && IsVoidPointerStyleCallback<C>
+        std::pair<C, void*> ThunkCallback(F&& callback)
+        {
+            auto* cb = static_cast<Callback<F>*>(CacheCallback(std::make_unique<Callback<F>>(std::move(callback))));
+            return [=]<typename R, typename... Args>(R(*)(Args..., void*)) {
+                return std::make_pair([](Args&& ...args, void* user_data) {
+                    return static_cast<Callback<F>*>(user_data)->callback(std::forward<Args>(args)...);
+                    }, cb);
+            }(static_cast<C>(nullptr));
+        }
+
+        /**
+         * Given a callable which cannot be implictly converted to a function pointer, caches it and returns a thunk which wraps the call to it
+         * into a function pointer-convertible callback leveraging ImGui's user data pointer.
+         * This overload works on callbacks with a Data* pointer which contains a void* pointer named UserData.
+         * @tparam C ImGui callback type to match.
+         * @tparam F Provided callable type.
+         * @param callback The callback.
+         * @return A pair containing the function pointer callback and the user data pointer storing the stateful callback.
+        */
+        template<typename C, typename F>
+            requires (!std::convertible_to<F, C>) && IsDataPointerStyleCallback<C>
+        std::pair<C, void*> ThunkCallback(F&& callback)
+        {
+            using Data = std::tuple_element_t<0, typename CallbackTraits<C>::Arguments>;
+            auto* cb = static_cast<Callback<F>*>(CacheCallback(std::make_unique<Callback<F>>(std::move(callback))));
+            return std::make_pair([](Data data) {
+                return static_cast<Callback<F>*>(data->UserData)->callback(data);
+                }, cb);
         }
     }
+
+    void NewFrame();
 
     class FormatArgs
     {
@@ -40,18 +127,44 @@ namespace NGui
     public:
         template<typename... Args>
         FormatArgs(std::format_string<Args...> fmt, Args&& ...args)
-            : value_(Detail::ConvertString(std::format(fmt, std::forward<Args>(args)...))) {}
+            : value_(Detail::CacheString(std::format(fmt, std::forward<Args>(args)...))) {}
 
         FormatArgs(std::string_view val)
-            : value_(Detail::ConvertString(val)) {}
+            : value_(Detail::CacheString(val)) {}
 
         FormatArgs(const char* val)
-            : value_(val) {}
+            : value_(Detail::CacheString(val)) {}
 
         FormatArgs(std::nullptr_t)
             : value_(nullptr) {}
 
         const char* GetValue() const { return value_; }
+    };
+
+    class FormatArgsWithEnd
+    {
+        const char* value_;
+        const char* valueEnd_ = nullptr;
+
+    public:
+        template<typename... Args>
+        FormatArgsWithEnd(std::format_string<Args...> fmt, Args&& ...args)
+            : value_(Detail::CacheString(std::format(fmt, std::forward<Args>(args)...))) {}
+
+        FormatArgsWithEnd(std::string_view val)
+            : value_(val.data()), valueEnd_(val.data() + val.size()) {}
+
+        FormatArgsWithEnd(const char* val)
+            : value_(val) {}
+
+        FormatArgsWithEnd(const char* val, const char* valEnd)
+            : value_(val), valueEnd_(valEnd) {}
+
+        FormatArgsWithEnd(std::nullptr_t)
+            : value_(nullptr) {}
+
+        const char* GetValue() const { return value_; }
+        const char* GetValueEnd() const { return valueEnd_; }
     };
 
     namespace Detail
@@ -208,8 +321,8 @@ namespace NGui
 
             [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
             {
-                if constexpr(std::convertible_to<decltype(callback), ImGuiSizeCallback>)
-                    ImGui::SetNextWindowSizeConstraints({}, {}, callback);
+                auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback>(std::move(callback));
+                ImGui::SetNextWindowSizeConstraints({}, {}, cb, data);
 
                 return *this;
             }
@@ -243,9 +356,9 @@ namespace NGui
 
     static constexpr struct TextT
     {
-        void operator()(FormatArgs fmt) const
+        void operator()(FormatArgsWithEnd fmt) const
         {
-            ImGui::TextUnformatted(fmt.GetValue());
+            ImGui::TextUnformatted(fmt.GetValue(), fmt.GetValueEnd());
         }
     } Text;
 

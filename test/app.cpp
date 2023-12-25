@@ -11,8 +11,9 @@
 #include <backends/imgui_impl_dx11.h>
 #include <d3d11.h>
 #include <tchar.h>
+#include <nearimgui.h>
 
-void Demo();
+void Demo(size_t frameId);
 
 // Data
 static ID3D11Device* g_pd3dDevice = nullptr;
@@ -82,6 +83,7 @@ int main(int, char**)
 
     // Main loop
     bool done = false;
+    size_t frameId = 0;
     while (!done)
     {
         // Poll and handle messages (inputs, window resize, etc.)
@@ -110,8 +112,9 @@ int main(int, char**)
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        NGui::NewFrame();
 
-        Demo();
+        Demo(frameId++);
 
         // Rendering
         ImGui::Render();
