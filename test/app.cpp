@@ -13,6 +13,7 @@
 #include <tchar.h>
 #include <nearimgui.h>
 
+void Setup();
 void Demo(size_t frameId);
 
 // Data
@@ -60,6 +61,8 @@ int main(int, char**)
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
+
+    Setup();
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);

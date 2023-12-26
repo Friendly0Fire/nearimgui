@@ -3,11 +3,15 @@
 #include <string_view>
 #include <format>
 #include <optional>
+#include <variant>
 
 namespace NGui
 {
     namespace Detail
     {
+        template<class... Ts>
+        struct Overloaded : Ts... { using Ts::operator()...; };
+
         const char* CacheString(std::string_view sv);
         const char* CacheString(std::string&& s);
 
@@ -191,11 +195,14 @@ namespace NGui
             }
             template<auto Push, auto Pop, typename... Args>
                 requires std::invocable<decltype(Push), Args...>
-            void InvokeStack(FormatArgs name, auto&& body, Args&& ...args) const
+            void InvokeStack(auto&& body, Args&& ...args) const
             {
                 Push(std::forward<Args>(args)...);
                 body();
-                Pop();
+                if constexpr (requires() { Pop(1); })
+                    Pop(1);
+                else
+                    Pop();
             }
         };
 
@@ -212,21 +219,6 @@ namespace NGui
 
         protected:
             using Base = CallableBlock<T>;
-        };
-
-        template<typename T>
-        class Callable : protected InvokeBase
-        {
-        public:
-            constexpr Callable() = default;
-
-            void operator()(std::string_view name, auto&& body) const
-            {
-                static_cast<const T*>(this)->operator()(name, {}, std::move(body));
-            }
-
-        protected:
-            using Base = Callable<T>;
         };
 
         template<typename T>
@@ -470,4 +462,78 @@ namespace NGui
             return operator()(fmt, minValue, maxValue, ParamsRange<T>{});
         }
     } Drag;
+
+    static constexpr class StyleT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(ImGuiCol_ style, ImU32 color, auto&& body) const
+        {
+            InvokeStack<[](ImGuiCol a, ImU32 b) { ImGui::PushStyleColor(a, b); }, ImGui::PopStyleColor>(std::move(body), Detail::Enum(style), color);
+        }
+        void operator()(ImGuiCol_ style, const ImVec4& color, auto&& body) const
+        {
+            InvokeStack<[](ImGuiCol a, const ImVec4& b) { ImGui::PushStyleColor(a, b); }, ImGui::PopStyleColor>(std::move(body), Detail::Enum(style), color);
+        }
+
+        void operator()(ImGuiStyleVar_ style, float val, auto&& body) const
+        {
+            InvokeStack<[](ImGuiStyleVar a, float b) { ImGui::PushStyleVar(a, b); }, ImGui::PopStyleVar>(std::move(body), Detail::Enum(style), val);
+        }
+        void operator()(ImGuiStyleVar_ style, const ImVec2& val, auto&& body) const
+        {
+            InvokeStack<[](ImGuiStyleVar a, const ImVec2& b) { ImGui::PushStyleVar(a, b); }, ImGui::PopStyleVar>(std::move(body), Detail::Enum(style), val);
+        }
+
+        void operator()(ImFont* font, auto&& body) const
+        {
+            InvokeStack<ImGui::PushFont, ImGui::PopFont>(std::move(body), font);
+        }
+
+        struct Color
+        {
+            ImGuiCol_ style;
+            std::variant<ImU32, ImVec4> color;
+        };
+        struct Style
+        {
+            ImGuiStyleVar_ style;
+            std::variant<float, ImVec2> val;
+        };
+
+        template<typename T, typename... Args>
+        requires (std::same_as<std::decay_t<T>, Color> || std::same_as<std::decay_t<T>, Style> || std::same_as<std::decay_t<T>, ImFont*> || std::invocable<T>)
+        void operator()(T&& v, Args&& ...args) const
+        {
+            using DT = std::decay_t<T>;
+            if constexpr (std::same_as<DT, Style>)
+            {
+                std::visit(Detail::Overloaded{
+                    [&](float val) { ImGui::PushStyleVar(v.style, val); },
+                    [&](const ImVec2& val) { ImGui::PushStyleVar(v.style, val); }
+                    }, v.val);
+            }
+            else if constexpr (std::same_as<DT, Color>)
+            {
+                std::visit(Detail::Overloaded{
+                    [&](ImU32 val) { ImGui::PushStyleColor(v.style, val); },
+                    [&](const ImVec4& val) { ImGui::PushStyleColor(v.style, val); }
+                    }, v.color);
+            }
+            else if constexpr (std::same_as<DT, ImFont*>)
+                ImGui::PushFont(v);
+            else if constexpr (std::invocable<T>)
+                v();
+
+            if constexpr (!std::invocable<T>)
+                operator()(std::forward<Args>(args)...);
+
+            if constexpr (std::same_as<DT, Style>)
+                ImGui::PopStyleVar();
+            else if constexpr (std::same_as<DT, Color>)
+                ImGui::PopStyleColor();
+            else if constexpr (std::same_as<DT, ImFont*>)
+                ImGui::PopFont();
+        }
+
+    } Style;
 }

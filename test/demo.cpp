@@ -1,6 +1,16 @@
 #include <imgui.h>
 #include <nearimgui.h>
 
+ImFont* fontBig = nullptr;
+
+void Setup()
+{
+    ImFontConfig cfg{};
+    ImGui::GetIO().Fonts->AddFontDefault(&cfg);
+    cfg.SizePixels = 40.f;
+    fontBig = ImGui::GetIO().Fonts->AddFontDefault(&cfg);
+}
+
 void Demo(size_t frameId)
 {
     auto& io = ImGui::GetIO();
@@ -21,7 +31,9 @@ void Demo(size_t frameId)
         NGui::Slider("float", f, 0.0f, 1.0f, { .flags = ImGuiSliderFlags_AlwaysClamp });            // Edit 1 float using a slider from 0.0f to 1.0f
         NGui::Drag("int", i, { .min = 1, .max = 10 });
         NGui::Drag("float range", f1, f2);
-        NGui::Drag("window width", windowWidth);
+        NGui::Style(fontBig, NGui::StyleT::Color { ImGuiCol_Text, 0xFF0000FF }, NGui::StyleT::Style { ImGuiStyleVar_Alpha, 0.2f }, [&] {
+            NGui::Drag("window width", windowWidth);
+        });
 
         if (NGui::Button({ "Button {}", counter }))                            // Buttons return true when clicked (most widgets return true when edited/activated)
             counter++;
