@@ -28,10 +28,10 @@ void Demo(size_t frameId)
         }).Open("Hello, world!", {&open}, [&] {
         NGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
 
-        NGui::Slider("float", f, 0.0f, 1.0f, { .flags = ImGuiSliderFlags_AlwaysClamp });            // Edit 1 float using a slider from 0.0f to 1.0f
-        NGui::Drag("int", i, { .min = 1, .max = 10 });
-        NGui::Drag("float range", f1, f2);
-        NGui::Style(fontBig, NGui::StyleT::Color { ImGuiCol_Text, 0xFF0000FF }, NGui::StyleT::Style { ImGuiStyleVar_Alpha, 0.2f }, [&] {
+        NGui::Style(ImGuiCol_Text, 0xFF0000FF, ImGuiStyleVar_Alpha, 0.2f, ImGuiStyleVar_ItemSpacing, ImVec2(30.f, 30.f), fontBig, [&] {
+            NGui::Slider("float", f, 0.0f, 1.0f, { .flags = ImGuiSliderFlags_AlwaysClamp });            // Edit 1 float using a slider from 0.0f to 1.0f
+            NGui::Drag("int", i, { .min = 1, .max = 10 });
+            NGui::Drag("float range", f1, f2);
             NGui::Drag("window width", windowWidth);
         });
 
