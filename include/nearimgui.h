@@ -7,6 +7,16 @@
 
 namespace NGui
 {
+    static constexpr struct AutoFitT
+    {
+        static constexpr float value = 0.f;
+    } AutoFit;
+
+    static constexpr struct PreserveT
+    {
+        static constexpr float value = -1.f;
+    } Preserve;
+
     namespace Detail
     {
         template<class... Ts>
@@ -222,7 +232,7 @@ namespace NGui
         };
 
         template<typename T>
-        constexpr ImGuiDataType GetDataType()
+        consteval ImGuiDataType GetDataType()
         {
             using Type = std::decay_t<T>;
             static_assert(std::is_arithmetic_v<Type>);
@@ -247,17 +257,18 @@ namespace NGui
             
             return ImGuiDataType_COUNT;
         }
+
+        template<typename T>
+        class BaseItem
+        {
+        public:
+            [[nodiscard]] const auto& Width(float w) const
+            {
+                ImGui::SetNextItemWidth(w);
+                return static_cast<const T&>(*this);
+            }
+        };
     }
-
-    static constexpr class AutoFitT
-    {
-        inline constexpr operator float() { return 0.f; }
-    } AutoFit;
-
-    static constexpr class PreserveT
-    {
-        inline constexpr operator float() { return -1.f; }
-    } Preserve;
 
     static constexpr class WindowT : public Detail::CallableBlock<WindowT>
     {
@@ -291,43 +302,76 @@ namespace NGui
         [[nodiscard]] auto* GetDrawList() const { return ImGui::GetWindowDrawList(); }
         [[nodiscard]] auto* GetViewport() const { return ImGui::GetWindowViewport(); }
 
-        struct Builder
+        [[nodiscard]] auto GetContentRegionMin() const { return ImGui::GetWindowContentRegionMin(); }
+        [[nodiscard]] auto GetContentRegionMax() const { return ImGui::GetWindowContentRegionMax(); }
+        [[nodiscard]] auto GetScrollX() const { return ImGui::GetScrollX(); }
+        [[nodiscard]] auto GetScrollY() const { return ImGui::GetScrollY(); }
+        [[nodiscard]] auto GetScrollMaxX() const { return ImGui::GetScrollMaxX(); }
+        [[nodiscard]] auto GetScrollMaxY() const { return ImGui::GetScrollMaxY(); }
+
+        [[nodiscard]] const auto& Position(const ImVec2& pos, ImGuiCond_ cond = ImGuiCond_Always, const ImVec2& pivot = { 0.f, 0.f }) const
         {
-            [[nodiscard]] const auto& Position(const ImVec2& pos, ImGuiCond_ cond = ImGuiCond_Always, const ImVec2& pivot = { 0.f, 0.f }) const
-            {
-                ImGui::SetNextWindowPos(pos, cond, pivot);
-                return *this;
-            }
+            ImGui::SetNextWindowPos(pos, cond, pivot);
+            return *this;
+        }
 
-            [[nodiscard]] const auto& Size(const ImVec2& size, ImGuiCond_ cond = ImGuiCond_Always) const
-            {
-                ImGui::SetNextWindowSize(size, cond);
-                return *this;
-            }
+        [[nodiscard]] const auto& Size(const ImVec2& size, ImGuiCond_ cond = ImGuiCond_Always) const
+        {
+            ImGui::SetNextWindowSize(size, cond);
+            return *this;
+        }
 
-            [[nodiscard]] const auto& SizeConstraints(const ImVec2& sizeMin, const ImVec2& sizeMax) const
-            {
-                ImGui::SetNextWindowSizeConstraints(sizeMin, sizeMax);
-                return *this;
-            }
+        [[nodiscard]] const auto& SizeConstraints(const ImVec2& sizeMin, const ImVec2& sizeMax) const
+        {
+            ImGui::SetNextWindowSizeConstraints(sizeMin, sizeMax);
+            return *this;
+        }
 
-            [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
-            {
-                auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback>(std::move(callback));
-                ImGui::SetNextWindowSizeConstraints({}, {}, cb, data);
+        [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
+        {
+            auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback>(std::move(callback));
+            ImGui::SetNextWindowSizeConstraints({}, {}, cb, data);
 
-                return *this;
-            }
+            return *this;
+        }
 
-            void Open(FormatArgs name, Params&& params, auto&& body) const;
-        } With;
+        [[nodiscard]] const auto& ContentSize(const ImVec2& size) const
+        {
+            ImGui::SetNextWindowContentSize(size);
+            return *this;
+        }
+
+        [[nodiscard]] const auto& Collapsed(bool collapsed, ImGuiCond cond = ImGuiCond_Always) const
+        {
+            ImGui::SetNextWindowCollapsed(collapsed, cond);
+            return *this;
+        }
+
+        [[nodiscard]] const auto& Focus() const
+        {
+            ImGui::SetNextWindowFocus();
+            return *this;
+        }
+
+        [[nodiscard]] const auto& Scroll(const ImVec2& scroll) const
+        {
+            ImGui::SetNextWindowScroll(scroll);
+            return *this;
+        }
+
+        [[nodiscard]] const auto& BackgroundAlpha(float alpha) const
+        {
+            ImGui::SetNextWindowBgAlpha(alpha);
+            return *this;
+        }
+
+        [[nodiscard]] const auto& Viewport(ImGuiID viewportID) const
+        {
+            ImGui::SetNextWindowViewport(viewportID);
+            return *this;
+        }
 
     } Window;
-
-    void WindowT::Builder::Open(FormatArgs name, Params&& params, auto&& body) const
-    {
-        Window(name, std::move(params), std::forward<decltype(body)>(body));
-    }
 
     static constexpr class RegionT : public Detail::CallableBlock<RegionT>
     {
@@ -362,7 +406,7 @@ namespace NGui
         }
     } Button;
 
-    static constexpr struct SliderT
+    static constexpr struct SliderT : public Detail::BaseItem<SliderT>
     {
         struct Params
         {
@@ -399,7 +443,7 @@ namespace NGui
         }
     } Slider;
 
-    static constexpr struct DragT
+    static constexpr struct DragT : public Detail::BaseItem<DragT>
     {
         template<typename T>
         struct Params
@@ -513,4 +557,51 @@ namespace NGui
         }
 
     } Style;
+
+    static constexpr class TabStopT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(bool tabStop, auto&& body) const
+        {
+            InvokeStack<ImGui::PushTabStop, ImGui::PopTabStop>(std::forward(body), tabStop);
+        }
+    } TabStop;
+
+    static constexpr class ButtonRepeatT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(bool repeat, auto&& body) const
+        {
+            InvokeStack<ImGui::PushButtonRepeat, ImGui::PopButtonRepeat>(std::forward(body), repeat);
+        }
+    } ButtonRepeat;
+
+    static constexpr class ItemWidthT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(float itemWidth, auto&& body) const
+        {
+            InvokeStack<ImGui::PushItemWidth, ImGui::PopItemWidth>(std::forward(body), itemWidth);
+        }
+    } ItemWidth;
+
+    static constexpr class TextWrapPosT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(float wrapLocalPosX, auto&& body) const
+        {
+            InvokeStack<ImGui::PushTextWrapPos, ImGui::PopTextWrapPos>(std::forward(body), wrapLocalPosX);
+        }
+
+        void Disable(auto&& body) const
+        {
+            operator()(-1.f, std::forward(body));
+        }
+
+        void ToEnd(auto&& body) const
+        {
+            operator()(0.f, std::forward(body));
+        }
+
+    } TextWrapPos;
 }
