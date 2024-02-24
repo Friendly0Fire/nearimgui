@@ -20,6 +20,8 @@ void Demo(size_t frameId)
     static bool open = true;
     static float f1 = 1.f, f2 = 2.f;
     static float windowWidth = 300.f;
+    static short checkFlags = 1;
+    static int checkFlags2 = 1;
     float ww = sin(frameId / 30.f) * 100.f + windowWidth;
 
     NGui::Window.SizeConstraints([&](ImGuiSizeCallbackData* data) {
@@ -38,8 +40,14 @@ void Demo(size_t frameId)
         if (NGui::Button({ "Button {}", counter }))                            // Buttons return true when clicked (most widgets return true when edited/activated)
             counter++;
         ImGui::SameLine();
-        NGui::Text({ "counter = {}", counter });
+        NGui::Text({ "counter = {}; cursorX = {}", counter, NGui::Window.Cursor.GetX()});
 
         NGui::Text({ "Application average {:.3f} ms/frame ({:.1f} FPS)", 1000.0f / io.Framerate, io.Framerate });
+
+        NGui::Checkbox.Flags("Flags", checkFlags, static_cast<short>(3));
+        NGui::Checkbox.Flags("Flags2", checkFlags2, 3);
+
+        NGui::RadioButton("Flags 1", checkFlags2, 1);
+        NGui::RadioButton("Flags 2", checkFlags2, 2);
     });
 }

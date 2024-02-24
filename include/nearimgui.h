@@ -194,6 +194,18 @@ namespace NGui
         protected:
             template<auto Begin, auto End, bool AlwaysCallEnd, typename... Args>
                 requires std::invocable<decltype(Begin), const char*, Args...>
+            void InvokeBlock(auto&& body, Args&& ...args) const
+            {
+                bool ret;
+                if (ret = Begin(std::forward<Args>(args)...))
+                    body();
+
+                if (AlwaysCallEnd || ret)
+                    End();
+            }
+
+            template<auto Begin, auto End, bool AlwaysCallEnd, typename... Args>
+                requires std::invocable<decltype(Begin), const char*, Args...>
             void InvokeBlock(FormatArgs name, auto&& body, Args&& ...args) const
             {
                 bool ret;
@@ -203,6 +215,7 @@ namespace NGui
                 if (AlwaysCallEnd || ret)
                     End();
             }
+
             template<auto Push, auto Pop, typename... Args>
                 requires std::invocable<decltype(Push), Args...>
             void InvokeStack(auto&& body, Args&& ...args) const
@@ -270,24 +283,10 @@ namespace NGui
         };
     }
 
-    static constexpr class WindowT : public Detail::CallableBlock<WindowT>
+    template<typename T>
+    class CommonWindowT
     {
     public:
-        struct Params
-        {
-            bool* open = nullptr;
-            ImGuiWindowFlags_ flags = ImGuiWindowFlags_None;
-        };
-
-        using Base::operator();
-        void operator()(FormatArgs name, Params&& params, auto&& body) const
-        {
-            if (params.open && !*params.open)
-                return;
-
-            InvokeBlock<ImGui::Begin, ImGui::End, true>(name, std::move(body), params.open, Detail::Enum(params.flags));
-        }
-
         [[nodiscard]] bool IsAppearing() const { return ImGui::IsWindowAppearing(); }
         [[nodiscard]] bool IsCollapsed() const { return ImGui::IsWindowCollapsed(); }
         [[nodiscard]] bool IsFocused(ImGuiFocusedFlags_ flags = ImGuiFocusedFlags_None) const { return ImGui::IsWindowFocused(Detail::Enum(flags)); }
@@ -312,19 +311,19 @@ namespace NGui
         [[nodiscard]] const auto& Position(const ImVec2& pos, ImGuiCond_ cond = ImGuiCond_Always, const ImVec2& pivot = { 0.f, 0.f }) const
         {
             ImGui::SetNextWindowPos(pos, cond, pivot);
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& Size(const ImVec2& size, ImGuiCond_ cond = ImGuiCond_Always) const
         {
             ImGui::SetNextWindowSize(size, cond);
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& SizeConstraints(const ImVec2& sizeMin, const ImVec2& sizeMax) const
         {
             ImGui::SetNextWindowSizeConstraints(sizeMin, sizeMax);
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
@@ -332,36 +331,68 @@ namespace NGui
             auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback>(std::move(callback));
             ImGui::SetNextWindowSizeConstraints({}, {}, cb, data);
 
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& ContentSize(const ImVec2& size) const
         {
             ImGui::SetNextWindowContentSize(size);
-            return *this;
-        }
-
-        [[nodiscard]] const auto& Collapsed(bool collapsed, ImGuiCond cond = ImGuiCond_Always) const
-        {
-            ImGui::SetNextWindowCollapsed(collapsed, cond);
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& Focus() const
         {
             ImGui::SetNextWindowFocus();
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
         [[nodiscard]] const auto& Scroll(const ImVec2& scroll) const
         {
             ImGui::SetNextWindowScroll(scroll);
-            return *this;
+            return static_cast<const T&>(*this);
         }
 
-        [[nodiscard]] const auto& BackgroundAlpha(float alpha) const
+        [[nodiscard]] const auto& SetBackgroundAlpha(float alpha) const
         {
             ImGui::SetNextWindowBgAlpha(alpha);
+            return static_cast<const T&>(*this);
+        }
+
+        const class CursorT
+        {
+        public:
+            auto GetStartPosition() const { return ImGui::GetCursorStartPos(); }
+            auto GetPosition() const { return ImGui::GetCursorPos(); }
+            auto GetX() const { return ImGui::GetCursorPosX(); }
+            auto GetY() const { return ImGui::GetCursorPosY(); }
+
+            auto SetPosition(const ImVec2& windowPosition) const { return ImGui::SetCursorPos(windowPosition); }
+            auto SetX(float windowX) const { return ImGui::SetCursorPosX(windowX); }
+            auto SetY(float windowY) const { return ImGui::SetCursorPosY(windowY); }
+        } Cursor;
+    };
+
+    static constexpr class WindowT : public Detail::CallableBlock<WindowT>, public CommonWindowT<WindowT>
+    {
+    public:
+        struct Params
+        {
+            bool* open = nullptr;
+            ImGuiWindowFlags_ flags = ImGuiWindowFlags_None;
+        };
+
+        using Base::operator();
+        void operator()(FormatArgs name, Params&& params, auto&& body) const
+        {
+            if (params.open && !*params.open)
+                return;
+
+            InvokeBlock<ImGui::Begin, ImGui::End, true>(name, std::move(body), params.open, Detail::Enum(params.flags));
+        }
+
+        [[nodiscard]] const auto& Collapsed(bool collapsed, ImGuiCond cond = ImGuiCond_Always) const
+        {
+            ImGui::SetNextWindowCollapsed(collapsed, cond);
             return *this;
         }
 
@@ -373,7 +404,7 @@ namespace NGui
 
     } Window;
 
-    static constexpr class RegionT : public Detail::CallableBlock<RegionT>
+    static constexpr class RegionT : public Detail::CallableBlock<RegionT>, public CommonWindowT<RegionT>
     {
     public:
         struct Params
@@ -388,7 +419,112 @@ namespace NGui
         {
             InvokeBlock<ImGui::BeginChild, ImGui::EndChild, true>(name, std::move(body), params.size, params.border, Detail::Enum(params.flags));
         }
-    } Region;
+    } Region; static constexpr class StyleT : protected Detail::InvokeBase
+    {
+    public:
+        template<typename... Args> requires (sizeof...(Args) > 1)
+            void operator()(Args&& ...args) const
+        {
+            Item(0, 0, std::forward<Args>(args)...);
+        }
+
+    private:
+        template<typename I, typename V, typename... Args> requires (sizeof...(Args) > 0
+            && ((std::same_as<std::decay_t<I>, ImGuiCol_> && (std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>))
+                || (std::same_as<std::decay_t<I>, ImGuiStyleVar_> && (std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>))))
+            void Item(int c, int s, I idx, const V& val, Args&& ...args) const
+        {
+            constexpr bool isColor = std::same_as<std::decay_t<I>, ImGuiCol_>;
+            constexpr bool isVar = std::same_as<std::decay_t<I>, ImGuiStyleVar_>;
+            if constexpr (isColor)
+            {
+                ImGui::PushStyleColor(idx, val);
+                ++c;
+            }
+            else if constexpr (isVar)
+            {
+                ImGui::PushStyleVar(idx, val);
+                ++s;
+            }
+
+            Item(c, s, std::forward<Args>(args)...);
+        }
+
+        template<typename... Args> requires (sizeof...(Args) > 0)
+            void Item(int c, int s, ImFont* font, Args&& ...args) const
+        {
+            ImGui::PushFont(font);
+
+            Item(c, s, std::forward<Args>(args)...);
+
+            ImGui::PopFont();
+        }
+
+        void Item(int c, int s, auto&& body) const
+        {
+            body();
+
+            if (c > 0) ImGui::PopStyleColor(c);
+            if (s > 0) ImGui::PopStyleVar(s);
+        }
+
+    } Style;
+
+    static constexpr class TabStopT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(bool tabStop, auto&& body) const
+        {
+            InvokeStack<ImGui::PushTabStop, ImGui::PopTabStop>(std::forward<decltype(body)>(body), tabStop);
+        }
+    } TabStop;
+
+    static constexpr class ButtonRepeatT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(bool repeat, auto&& body) const
+        {
+            InvokeStack<ImGui::PushButtonRepeat, ImGui::PopButtonRepeat>(std::forward<decltype(body)>(body), repeat);
+        }
+    } ButtonRepeat;
+
+    static constexpr class ItemWidthT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(float itemWidth, auto&& body) const
+        {
+            InvokeStack<ImGui::PushItemWidth, ImGui::PopItemWidth>(std::forward<decltype(body)>(body), itemWidth);
+        }
+    } ItemWidth;
+
+    static constexpr class TextWrapPosT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(float wrapLocalPosX, auto&& body) const
+        {
+            InvokeStack<ImGui::PushTextWrapPos, ImGui::PopTextWrapPos>(std::forward<decltype(body)>(body), wrapLocalPosX);
+        }
+
+        void Disable(auto&& body) const
+        {
+            operator()(-1.f, std::forward<decltype(body)>(body));
+        }
+
+        void ToEnd(auto&& body) const
+        {
+            operator()(0.f, std::forward<decltype(body)>(body));
+        }
+
+    } TextWrapPos;
+
+    static constexpr class GroupT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(auto&& body) const
+        {
+            InvokeBlock<ImGui::BeginGroup, ImGui::EndGroup, false>(std::forward<decltype(body)>(body));
+        }
+    } Group;
 
     static constexpr struct TextT
     {
@@ -396,6 +532,31 @@ namespace NGui
         {
             ImGui::TextUnformatted(fmt.GetValue(), fmt.GetValueEnd());
         }
+
+        void Colored(const ImVec4& col, FormatArgsWithEnd fmt)
+        {
+            Style(ImGuiCol_Text, col,
+                [&] { operator()(std::move(fmt)); });
+        }
+
+        void Disabled(FormatArgsWithEnd fmt)
+        {
+            Style(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled],
+                [&] { operator()(std::move(fmt)); });
+        }
+
+        void Wrapped(FormatArgsWithEnd fmt)
+        {
+            TextWrapPos(0.f, [&] { operator()(std::move(fmt)); });
+        }
+
+        void Bullet(FormatArgsWithEnd fmt)
+        {
+            ImGui::Bullet();
+            operator()(std::move(fmt));
+        }
+
+        // TODO: LabelText, SeparatorText
     } Text;
 
     static constexpr struct ButtonT
@@ -404,7 +565,55 @@ namespace NGui
         {
             return ImGui::Button(fmt.GetValue(), size);
         }
+
+        bool Small(FormatArgs fmt) const
+        {
+            return ImGui::SmallButton(fmt.GetValue());
+        }
+
+        bool Invisible(FormatArgs fmtID, const ImVec2& size = {}, ImGuiButtonFlags flags = ImGuiButtonFlags_None) const
+        {
+            return ImGui::InvisibleButton(fmtID.GetValue(), size, flags);
+        }
+
+        bool Arrow(FormatArgs fmt, ImGuiDir dir) const
+        {
+            return ImGui::ArrowButton(fmt.GetValue(), dir);
+        }
+
     } Button;
+
+    static constexpr struct CheckboxT
+    {
+        bool operator()(FormatArgs fmt, bool& v) const
+        {
+            return ImGui::Checkbox(fmt.GetValue(), &v);
+        }
+
+        template<std::integral T>
+        bool Flags(FormatArgs fmt, T& value, T fullMask) const
+        {
+            if constexpr (std::signed_integral<T>)
+                return ImGui::CheckboxFlags(fmt.GetValue(), reinterpret_cast<int*>(&value), static_cast<int>(fullMask));
+            else
+                return ImGui::CheckboxFlags(fmt.GetValue(), reinterpret_cast<unsigned int*>(&value), static_cast<unsigned int>(fullMask));
+        }
+
+    } Checkbox;
+
+    static constexpr struct RadioButtonT
+    {
+        bool operator()(FormatArgs fmt, bool& active) const
+        {
+            return ImGui::RadioButton(fmt.GetValue(), &active);
+        }
+
+        bool operator()(FormatArgs fmt, int& selectedIndex, int thisIndex) const
+        {
+            return ImGui::RadioButton(fmt.GetValue(), &selectedIndex, thisIndex);
+        }
+
+    } RadioButton;
 
     static constexpr struct SliderT : public Detail::BaseItem<SliderT>
     {
@@ -506,102 +715,4 @@ namespace NGui
             return operator()(fmt, minValue, maxValue, ParamsRange<T>{});
         }
     } Drag;
-
-    static constexpr class StyleT : protected Detail::InvokeBase
-    {
-    public:
-        template<typename... Args> requires (sizeof...(Args) > 1)
-        void operator()(Args&& ...args) const
-        {
-            Item(0, 0, std::forward<Args>(args)...);
-        }
-
-    private:
-        template<typename I, typename V, typename... Args> requires (sizeof...(Args) > 0
-        && ((std::same_as<std::decay_t<I>, ImGuiCol_> && (std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>))
-        || (std::same_as<std::decay_t<I>, ImGuiStyleVar_> && (std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>))))
-        void Item(int c, int s, I idx, const V& val, Args&& ...args) const
-        {
-            constexpr bool isColor = std::same_as<std::decay_t<I>, ImGuiCol_>;
-            constexpr bool isVar = std::same_as<std::decay_t<I>, ImGuiStyleVar_>;
-            if constexpr (isColor)
-            {
-                ImGui::PushStyleColor(idx, val);
-                ++c;
-            }
-            else if constexpr (isVar)
-            {
-                ImGui::PushStyleVar(idx, val);
-                ++s;
-            }
-
-            Item(c, s, std::forward<Args>(args)...);
-        }
-
-        template<typename... Args> requires (sizeof...(Args) > 0)
-        void Item(int c, int s, ImFont* font, Args&& ...args) const
-        {
-            ImGui::PushFont(font);
-
-            Item(c, s, std::forward<Args>(args)...);
-
-            ImGui::PopFont();
-        }
-
-        void Item(int c, int s, auto&& body) const
-        {
-            body();
-
-            if(c > 0) ImGui::PopStyleColor(c);
-            if(s > 0) ImGui::PopStyleVar(s);
-        }
-
-    } Style;
-
-    static constexpr class TabStopT : protected Detail::InvokeBase
-    {
-    public:
-        void operator()(bool tabStop, auto&& body) const
-        {
-            InvokeStack<ImGui::PushTabStop, ImGui::PopTabStop>(std::forward(body), tabStop);
-        }
-    } TabStop;
-
-    static constexpr class ButtonRepeatT : protected Detail::InvokeBase
-    {
-    public:
-        void operator()(bool repeat, auto&& body) const
-        {
-            InvokeStack<ImGui::PushButtonRepeat, ImGui::PopButtonRepeat>(std::forward(body), repeat);
-        }
-    } ButtonRepeat;
-
-    static constexpr class ItemWidthT : protected Detail::InvokeBase
-    {
-    public:
-        void operator()(float itemWidth, auto&& body) const
-        {
-            InvokeStack<ImGui::PushItemWidth, ImGui::PopItemWidth>(std::forward(body), itemWidth);
-        }
-    } ItemWidth;
-
-    static constexpr class TextWrapPosT : protected Detail::InvokeBase
-    {
-    public:
-        void operator()(float wrapLocalPosX, auto&& body) const
-        {
-            InvokeStack<ImGui::PushTextWrapPos, ImGui::PopTextWrapPos>(std::forward(body), wrapLocalPosX);
-        }
-
-        void Disable(auto&& body) const
-        {
-            operator()(-1.f, std::forward(body));
-        }
-
-        void ToEnd(auto&& body) const
-        {
-            operator()(0.f, std::forward(body));
-        }
-
-    } TextWrapPos;
 }
