@@ -613,6 +613,44 @@ namespace NGui
             return ImGui::RadioButton(fmt.GetValue(), &selectedIndex, thisIndex);
         }
 
+        std::optional<int> operator()(std::initializer_list<std::pair<FormatArgs, int>> radioButtons, int& selectedIndex, bool sameLine = false) const
+        {
+            std::optional<int> modifiedIndex = std::nullopt;
+
+            for (auto it = radioButtons.begin(); it != radioButtons.end(); )
+            {
+                if (ImGui::RadioButton(it->first.GetValue(), &selectedIndex, it->second))
+                    modifiedIndex = it->second;
+
+                ++it;
+
+                if (sameLine && it != radioButtons.end())
+                    ImGui::SameLine();
+            }
+
+            return modifiedIndex;
+        }
+
+        std::optional<int> operator()(std::initializer_list<FormatArgs> radioButtons, int& selectedIndex, bool sameLine = false) const
+        {
+            std::optional<int> modifiedIndex = std::nullopt;
+
+            int index = 0;
+            for (auto it = radioButtons.begin(); it != radioButtons.end(); )
+            {
+                if (ImGui::RadioButton(it->GetValue(), &selectedIndex, index))
+                    modifiedIndex = index;
+
+                ++index;
+                ++it;
+
+                if (sameLine && it != radioButtons.end())
+                    ImGui::SameLine();
+            }
+
+            return modifiedIndex;
+        }
+
     } RadioButton;
 
     static constexpr struct SliderT : public Detail::BaseItem<SliderT>
