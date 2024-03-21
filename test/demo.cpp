@@ -1,5 +1,6 @@
 #include <imgui.h>
 #include <nearimgui.h>
+#include <array>
 
 ImFont* fontBig = nullptr;
 
@@ -23,6 +24,9 @@ void Demo(size_t frameId)
     static short checkFlags = 1;
     static int checkFlags2 = 1;
     static int checkFlags3 = 0;
+    static std::array<char, 512> buf;
+    static std::string resizableBuf;
+    static size_t resizableBufSizeCb = 0;
     float ww = sin(frameId / 30.f) * 100.f + windowWidth;
 
     NGui::Window.SizeConstraints([&](ImGuiSizeCallbackData* data) {
@@ -51,5 +55,13 @@ void Demo(size_t frameId)
         NGui::RadioButton("Flags 1", checkFlags2, 1);
         NGui::RadioButton("Flags 2", checkFlags2, 2);
         NGui::RadioButton({ "A", "B", "C" }, checkFlags3, true);
+
+        NGui::TextBox("Simple box", buf);
+
+        NGui::TextBox("Resizable box", resizableBuf);
+
+        NGui::TextBox("Resizable callback box", resizableBuf, [&](ImGuiInputTextCallbackData*) { resizableBufSizeCb = resizableBuf.capacity(); return 0; });
+
+        NGui::Text({ "Resizable capacity: {}", resizableBufSizeCb });
     });
 }

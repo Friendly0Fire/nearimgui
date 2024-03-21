@@ -1,12 +1,100 @@
 #pragma once
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <string_view>
 #include <format>
 #include <optional>
 #include <variant>
+#include <span>
+#include <utility>
+#include <misc/cpp/imgui_stdlib.h>
 
 namespace NGui
 {
+    template<typename E> requires std::is_enum_v<E>
+    constexpr bool EnableFlagOperators = false;
+
+    template<> constexpr bool EnableFlagOperators<ImGuiWindowFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiChildFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiInputTextFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTreeNodeFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiPopupFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiSelectableFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiComboFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTabBarFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTabItemFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiFocusedFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiHoveredFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiDockNodeFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiDragDropFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiButtonFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiColorEditFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiSliderFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTableFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTableColumnFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTableRowFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiSeparatorFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiFocusRequestFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTextFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTooltipFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiNextWindowDataFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiNextItemDataFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiInputFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiActivateFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiScrollFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiNavHighlightFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiNavMoveFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiTypingSelectFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiOldColumnFlags_> = true;
+    template<> constexpr bool EnableFlagOperators<ImGuiDebugLogFlags_> = true;
+
+    template<typename E, typename EP> requires std::is_enum_v<E> && std::is_enum_v<EP>
+    constexpr bool IsEquivalentEnum = false;
+    template<typename E> constexpr bool IsEquivalentEnum<E, E> = true;
+
+    template<> constexpr bool IsEquivalentEnum<ImGuiHoveredFlags_, ImGuiHoveredFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiInputTextFlags_, ImGuiInputTextFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiButtonFlags_, ImGuiButtonFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiComboFlags_, ImGuiComboFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiSliderFlags_, ImGuiSliderFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiSelectableFlags_, ImGuiSelectableFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiTreeNodeFlags_, ImGuiTreeNodeFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiDockNodeFlags_, ImGuiDockNodeFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiTabBarFlags_, ImGuiTabBarFlagsPrivate_> = true;
+    template<> constexpr bool IsEquivalentEnum<ImGuiTabItemFlags_, ImGuiTabItemFlagsPrivate_> = true;
+
+    template<typename E> requires std::is_enum_v<E>
+    constexpr auto ToUnderlying(E e)
+    {
+        return static_cast<std::underlying_type_t<E>>(e);
+    }
+
+    template<typename E, typename E2> requires EnableFlagOperators<E> && IsEquivalentEnum<E, E2>
+    constexpr auto operator|(E a, E2 b)
+    {
+        return static_cast<E>(ToUnderlying(a) | ToUnderlying(b));
+    }
+
+    template<typename E, typename E2> requires EnableFlagOperators<E>&& IsEquivalentEnum<E, E2>
+    constexpr auto operator&(E a, E2 b)
+    {
+        return static_cast<E>(ToUnderlying(a) & ToUnderlying(b));
+    }
+
+    template<typename E, typename E2> requires EnableFlagOperators<E>&& IsEquivalentEnum<E, E2>
+    constexpr auto& operator|=(E& a, E2 b)
+    {
+        a = static_cast<E>(ToUnderlying(a) | ToUnderlying(b));
+        return a;
+    }
+
+    template<typename E, typename E2> requires EnableFlagOperators<E>&& IsEquivalentEnum<E, E2>
+    constexpr auto& operator&=(E& a, E2 b)
+    {
+        a = static_cast<E>(ToUnderlying(a) & ToUnderlying(b));
+        return a;
+    }
+
     static constexpr struct AutoFitT
     {
         static constexpr float value = 0.f;
@@ -83,7 +171,7 @@ namespace NGui
          * @param callback The callback.
          * @return A pair containing the function pointer callback and the user data pointer (here, always null).
         */
-        template<typename C, typename F>
+        template<typename C, bool Cache, typename F>
         requires std::convertible_to<F, C>
         std::pair<C, void*> ThunkCallback(F&& callback)
         {
@@ -99,15 +187,22 @@ namespace NGui
          * @param callback The callback.
          * @return A pair containing the function pointer callback and the user data pointer storing the stateful callback.
         */
-        template<typename C, typename F>
+        template<typename C, bool Cache, typename F>
         requires (!std::convertible_to<F, C>) && IsVoidPointerStyleCallback<C>
-        std::pair<C, void*> ThunkCallback(F&& callback)
+        auto ThunkCallback(F&& callback)
         {
-            auto* cb = static_cast<Callback<F>*>(CacheCallback(std::make_unique<Callback<F>>(std::move(callback))));
+            auto cb = [&] {
+                auto c = std::make_unique<Callback<F>>(std::move(callback));
+                if constexpr (Cache)
+                    return static_cast<Callback<F>*>(CacheCallback(std::move(c)));
+                else
+                    return std::move(c);
+                }();
+
             return [=]<typename R, typename... Args>(R(*)(Args..., void*)) {
                 return std::make_pair([](Args&& ...args, void* user_data) {
                     return static_cast<Callback<F>*>(user_data)->callback(std::forward<Args>(args)...);
-                    }, cb);
+                    }, std::move(cb));
             }(static_cast<C>(nullptr));
         }
 
@@ -120,15 +215,22 @@ namespace NGui
          * @param callback The callback.
          * @return A pair containing the function pointer callback and the user data pointer storing the stateful callback.
         */
-        template<typename C, typename F>
+        template<typename C, bool Cache, typename F>
             requires (!std::convertible_to<F, C>) && IsDataPointerStyleCallback<C>
-        std::pair<C, void*> ThunkCallback(F&& callback)
+        auto ThunkCallback(F&& callback)
         {
+            auto cb = [&] {
+                auto c = std::make_unique<Callback<F>>(std::move(callback));
+                if constexpr (Cache)
+                    return static_cast<Callback<F>*>(CacheCallback(std::move(c)));
+                else
+                    return std::move(c);
+                }();
+
             using Data = std::tuple_element_t<0, typename CallbackTraits<C>::Arguments>;
-            auto* cb = static_cast<Callback<F>*>(CacheCallback(std::make_unique<Callback<F>>(std::move(callback))));
             return std::make_pair([](Data data) {
                 return static_cast<Callback<F>*>(data->UserData)->callback(data);
-                }, cb);
+                }, std::move(cb));
         }
     }
 
@@ -328,7 +430,7 @@ namespace NGui
 
         [[nodiscard]] const auto& SizeConstraints(std::invocable<ImGuiSizeCallbackData*> auto&& callback) const
         {
-            auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback>(std::move(callback));
+            auto&& [cb, data] = Detail::ThunkCallback<ImGuiSizeCallback, true>(std::move(callback));
             ImGui::SetNextWindowSizeConstraints({}, {}, cb, data);
 
             return static_cast<const T&>(*this);
@@ -753,4 +855,78 @@ namespace NGui
             return operator()(fmt, minValue, maxValue, ParamsRange<T>{});
         }
     } Drag;
+
+    static constexpr struct TextBoxT : public Detail::BaseItem<TextBoxT>
+    {
+    private:
+        struct StringResizeCallbackData
+        {
+            std::string& str;
+            ImGuiInputTextCallback chainCallback;
+            void* chainCallbackUserData;
+        };
+
+    public:
+        struct Params {
+            ImGuiInputTextFlags_ flags = ImGuiInputTextFlags_None;
+            std::optional<ImVec2> size = std::nullopt;
+            std::optional<FormatArgs> hint = std::nullopt;
+        };
+
+        static int StringResizeCallback(ImGuiInputTextCallbackData* data)
+        {
+            auto* userData = static_cast<StringResizeCallbackData*>(data->UserData);
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+            {
+                // Resize string callback
+                // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
+                std::string& str = userData->str;
+                IM_ASSERT(data->Buf == str.c_str());
+                str.resize(data->BufTextLen);
+                data->Buf = str.data();
+            }
+            if (userData && userData->chainCallback)
+            {
+                // Forward to user callback, if any
+                data->UserData = userData->chainCallbackUserData;
+                return userData->chainCallback(data);
+            }
+            return 0;
+        }
+
+        bool operator()(FormatArgs fmt, std::span<char> buf, Params&& params = {}) const
+        {
+            if (params.size)
+                params.flags |= ImGuiInputTextFlags_Multiline;
+            return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, buf.data(), static_cast<int>(buf.size()), params.size ? *params.size : ImVec2(0, 0), params.flags);
+        }
+
+        bool operator()(FormatArgs fmt, std::span<char> buf, std::invocable<ImGuiInputTextCallbackData*> auto&& callback, Params&& params = {}) const
+        {
+            if (params.size)
+                params.flags |= ImGuiInputTextFlags_Multiline;
+            auto&& [cb, data] = Detail::ThunkCallback<ImGuiInputTextCallback, false>(std::move(callback));
+            return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, buf.data(), static_cast<int>(buf.size()), params.size ? *params.size : ImVec2(0, 0), params.flags, cb, data.get());
+        }
+
+        bool operator()(FormatArgs fmt, std::string& str, Params&& params = {}) const
+        {
+            params.flags |= ImGuiInputTextFlags_CallbackResize;
+            if (params.size)
+                params.flags |= ImGuiInputTextFlags_Multiline;
+
+            StringResizeCallbackData wrapData{ str, nullptr, nullptr };
+            return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, str.data(), static_cast<int>(str.capacity() + 1), params.size ? *params.size : ImVec2(0, 0), params.flags, StringResizeCallback, &wrapData);
+        }
+
+        bool operator()(FormatArgs fmt, std::string& str, std::invocable<ImGuiInputTextCallbackData*> auto&& callback, Params&& params = {}) const
+        {
+            params.flags |= ImGuiInputTextFlags_CallbackResize;
+            if (params.size)
+                params.flags |= ImGuiInputTextFlags_Multiline;
+            auto&& [cb, data] = Detail::ThunkCallback<ImGuiInputTextCallback, false>(std::move(callback));
+            StringResizeCallbackData wrapData{ str, cb, data.get() };
+            return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, str.data(), static_cast<int>(str.capacity() + 1), params.size ? *params.size : ImVec2(0, 0), params.flags, StringResizeCallback, &wrapData);
+        }
+    } TextBox;
 }
