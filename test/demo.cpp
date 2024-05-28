@@ -27,12 +27,15 @@ void Demo(size_t frameId)
     static std::array<char, 512> buf;
     static std::string resizableBuf;
     static size_t resizableBufSizeCb = 0;
-    float ww = sin(frameId / 30.f) * 100.f + windowWidth;
+    static bool animate = true;
+    static int vec[3] = { 1, 2, 3 };
+    float ww = animate ? (sin(frameId / 30.f) * 100.f + windowWidth) : 300.f;
 
     NGui::Window.SizeConstraints([&](ImGuiSizeCallbackData* data) {
         data->DesiredSize.x = ww;
         data->DesiredSize.y = 400.f;
         })("Hello, world!", {&open}, [&] {
+        NGui::Checkbox("Animate window size", animate);
         NGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
 
         NGui::Style(ImGuiCol_Text, 0xFF0000FF, ImGuiStyleVar_Alpha, 0.2f, ImGuiStyleVar_ItemSpacing, ImVec2(30.f, 30.f), fontBig, [&] {
@@ -63,5 +66,10 @@ void Demo(size_t frameId)
         NGui::TextBox("Resizable callback box", resizableBuf, [&](ImGuiInputTextCallbackData*) { resizableBufSizeCb = resizableBuf.capacity(); return 0; });
 
         NGui::Text({ "Resizable capacity: {}", resizableBufSizeCb });
+
+        NGui::Input("f1 input", f1);
+        NGui::Input("f2 input", f2, { .step = 10.f });
+        NGui::Input("i input", i, { .step = 10, .stepFast = 100 });
+        NGui::Input("vec", vec, { .step = 10, .stepFast = 100 });
     });
 }

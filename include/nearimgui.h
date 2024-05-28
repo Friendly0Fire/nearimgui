@@ -107,6 +107,9 @@ namespace NGui
 
     namespace Detail
     {
+        template<typename T>
+        concept Numeric = std::integral<T> || std::floating_point<T>;
+
         template<class... Ts>
         struct Overloaded : Ts... { using Ts::operator()...; };
 
@@ -929,4 +932,46 @@ namespace NGui
             return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, str.data(), static_cast<int>(str.capacity() + 1), params.size ? *params.size : ImVec2(0, 0), params.flags, StringResizeCallback, &wrapData);
         }
     } TextBox;
+
+    static constexpr struct InputT : public Detail::BaseItem<InputT>
+    {
+    private:
+        template<typename T>
+        using SpanConvertibleValueType = typename decltype(std::span{ std::declval<T>() })::value_type;
+
+    public:
+        struct Params {
+        };
+
+        template<typename T>
+        struct TypedParams : Params
+        {
+            std::optional<T> step = std::nullopt;
+            std::optional<T> stepFast = std::nullopt;
+            FormatArgs format = nullptr;
+            ImGuiInputTextFlags_ flags = ImGuiInputTextFlags_None;
+        };
+
+        template<Detail::Numeric T>
+        bool operator()(FormatArgs fmt, T& value, TypedParams<T>&& params = {}) const
+        {
+            return ImGui::InputScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value,
+                params.step ? &*params.step : nullptr,
+                params.stepFast ? &*params.stepFast : nullptr,
+                params.format.GetValue(),
+                params.flags);
+        }
+
+        template<typename T> requires Detail::Numeric<SpanConvertibleValueType<T>>
+        bool operator()(FormatArgs fmt, T&& value, TypedParams<SpanConvertibleValueType<T>>&& params = {}) const
+        {
+            std::span s(value);
+            return ImGui::InputScalarN(fmt.GetValue(), Detail::GetDataType<SpanConvertibleValueType<T>>(), s.data(), static_cast<int>(s.size()),
+                params.step ? &*params.step : nullptr,
+                params.stepFast ? &*params.stepFast : nullptr,
+                params.format.GetValue(),
+                params.flags);
+        }
+
+    } Input;
 }
