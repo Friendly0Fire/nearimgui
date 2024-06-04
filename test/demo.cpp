@@ -100,6 +100,10 @@ void Demo(size_t frameId)
             NGui::Text("Initially visible");
             });
 
+        NGui::TreeNode.Opened[{ false, ImGuiCond_FirstUseEver }]("Not first open", [] {
+            NGui::Text("Not initially visible");
+            });
+
         NGui::CollapsingHeader("Collapsing", [] {
             NGui::Text("Collapsed");
             });

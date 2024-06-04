@@ -996,6 +996,18 @@ namespace NGui
                 return parent;
             }
 
+            const TreeNodeT& operator[](bool open) const
+            {
+                ImGui::SetNextItemOpen(state.first == Open, ImGuiCond_None);
+                return parent;
+            }
+
+            const TreeNodeT& operator[](std::pair<bool, ImGuiCond_> state) const
+            {
+                ImGui::SetNextItemOpen(state.first == Open, state.second);
+                return parent;
+            }
+
             void operator()(auto&& ...args) const
             {
                 ImGui::SetNextItemOpen(Open, ImGuiCond_None);
