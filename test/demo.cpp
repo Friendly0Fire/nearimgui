@@ -71,5 +71,37 @@ void Demo(size_t frameId)
         NGui::Input("f2 input", f2, { .step = 10.f });
         NGui::Input("i input", i, { .step = 10, .stepFast = 100 });
         NGui::Input("vec", vec, { .step = 10, .stepFast = 100 });
+
+        NGui::TreeNode("Root", [] {
+            NGui::TreeNode("Child A", [] {
+                NGui::Text("Lorem");
+                });
+            NGui::TreeNode("Child B", [] {
+                NGui::TreeNode("Child C", [] {
+                    NGui::Text("Ipsum");
+                    });
+                });
+            });
+
+
+        NGui::TreeNode("treenodeid", "Tree Node ID", [] {
+            NGui::Text("whatever");
+            });
+
+        NGui::TreeNode.Opened("Always open", [] {
+            NGui::Text("Always visible");
+            });
+
+        NGui::TreeNode.Closed("Always closed", [] {
+            NGui::Text("Always hidden");
+            });
+
+        NGui::TreeNode.Opened[ImGuiCond_FirstUseEver]("First open", [] {
+            NGui::Text("Initially visible");
+            });
+
+        NGui::CollapsingHeader("Collapsing", [] {
+            NGui::Text("Collapsed");
+            });
     });
 }

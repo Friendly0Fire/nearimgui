@@ -492,7 +492,7 @@ namespace NGui
             if (params.open && !*params.open)
                 return;
 
-            InvokeBlock<ImGui::Begin, ImGui::End, true>(name, std::move(body), params.open, Detail::Enum(params.flags));
+            InvokeBlock<ImGui::Begin, ImGui::End, true>(name, std::forward<decltype(body)>(body), params.open, Detail::Enum(params.flags));
         }
 
         [[nodiscard]] const auto& Collapsed(bool collapsed, ImGuiCond cond = ImGuiCond_Always) const
@@ -522,9 +522,11 @@ namespace NGui
         using Base::operator();
         void operator()(FormatArgs name, Params&& params, auto&& body) const
         {
-            InvokeBlock<ImGui::BeginChild, ImGui::EndChild, true>(name, std::move(body), params.size, params.border, Detail::Enum(params.flags));
+            InvokeBlock<ImGui::BeginChild, ImGui::EndChild, true>(name, std::forward<decltype(body)>(body), params.size, params.border, Detail::Enum(params.flags));
         }
-    } Region; static constexpr class StyleT : protected Detail::InvokeBase
+    } Region;
+    
+    static constexpr class StyleT : protected Detail::InvokeBase
     {
     public:
         template<typename... Args> requires (sizeof...(Args) > 1)
@@ -974,4 +976,59 @@ namespace NGui
         }
 
     } Input;
+
+    static constexpr class TreeNodeT : protected Detail::InvokeBase
+    {
+    public:
+        template<bool Open>
+        class Opener
+        {
+            const TreeNodeT& parent;
+
+            constexpr Opener(const TreeNodeT& p) : parent(p) {}
+
+            friend class TreeNodeT;
+
+        public:
+            const TreeNodeT& operator[](ImGuiCond_ cond) const
+            {
+                ImGui::SetNextItemOpen(Open, cond);
+                return parent;
+            }
+
+            void operator()(auto&& ...args) const
+            {
+                ImGui::SetNextItemOpen(Open, ImGuiCond_None);
+                parent(std::forward<decltype(args)>(args)...);
+            }
+        };
+
+        void operator()(FormatArgs label, auto&& body) const
+        {
+            InvokeBlock<static_cast<bool(*)(const char*)>(ImGui::TreeNode), ImGui::TreePop, false>(label, std::forward<decltype(body)>(body));
+        }
+
+        void operator()(FormatArgs id, FormatArgs label, auto&& body) const
+        {
+            InvokeBlock<static_cast<bool(*)(const char*, const char*, ...)>(ImGui::TreeNode), ImGui::TreePop, false>(id, std::forward<decltype(body)>(body), label.GetValue());
+        }
+
+        const Opener<true> Opened{ *this };
+        const Opener<false> Closed{ *this };
+
+    } TreeNode;
+
+    static constexpr class CollapsingHeaderT : public Detail::CallableBlock<CollapsingHeaderT>
+    {
+    public:
+        struct Params {
+            ImGuiTreeNodeFlags_ flags = ImGuiTreeNodeFlags_None;
+        };
+
+        using Base::operator();
+        void operator()(FormatArgs label, Params&& params, auto&& body) const
+        {
+            InvokeBlock<static_cast<bool(*)(const char*, ImGuiTreeNodeFlags)>(ImGui::CollapsingHeader), [] {}, false>(label, std::forward<decltype(body)>(body), params.flags);
+        }
+    } CollapsingHeader;
 }
