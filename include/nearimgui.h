@@ -380,9 +380,9 @@ namespace NGui
         class BaseItem
         {
         public:
-            [[nodiscard]] const auto& Width(float w) const
+            const T& operator[](float width) const
             {
-                ImGui::SetNextItemWidth(w);
+                ImGui::SetNextItemWidth(width);
                 return static_cast<const T&>(*this);
             }
         };
@@ -998,7 +998,7 @@ namespace NGui
 
             const TreeNodeT& operator[](bool open) const
             {
-                ImGui::SetNextItemOpen(state.first == Open, ImGuiCond_None);
+                ImGui::SetNextItemOpen(open == Open, ImGuiCond_None);
                 return parent;
             }
 

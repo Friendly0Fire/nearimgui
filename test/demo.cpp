@@ -42,7 +42,7 @@ void Demo(size_t frameId)
             NGui::Slider("float", f, 0.0f, 1.0f, { .flags = ImGuiSliderFlags_AlwaysClamp });            // Edit 1 float using a slider from 0.0f to 1.0f
             NGui::Drag("int", i, { .min = 1, .max = 10 });
             NGui::Drag("float range", f1, f2);
-            NGui::Drag.Width(80.f)("window width", windowWidth);
+            NGui::Drag[80.f]("window width", windowWidth);
         });
 
         if (NGui::Button({ "Button {}", counter }))                            // Buttons return true when clicked (most widgets return true when edited/activated)
