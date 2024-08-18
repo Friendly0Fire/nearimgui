@@ -12,23 +12,26 @@ void Setup()
     fontBig = ImGui::GetIO().Fonts->AddFontDefault(&cfg);
 }
 
+float f = 0.0f;
+int i = 1;
+int counter = 0;
+bool open = true;
+float f1 = 1.f, f2 = 2.f;
+float windowWidth = 300.f;
+short checkFlags = 1;
+int checkFlags2 = 1;
+int checkFlags3 = 0;
+std::array<char, 512> buf;
+std::string resizableBuf;
+size_t resizableBufSizeCb = 0;
+bool animate = true;
+int vec[3] = { 1, 2, 3 };
+NGui::Validated validated{ 10.f, [](float v) { return v > 1.f; } };
+NGui::Validated<std::string> validatedString{ "Test", [](const std::string& v) { return v.starts_with("T"); } };
+
 void Demo(size_t frameId)
 {
     auto& io = ImGui::GetIO();
-    static float f = 0.0f;
-    static int i = 1;
-    static int counter = 0;
-    static bool open = true;
-    static float f1 = 1.f, f2 = 2.f;
-    static float windowWidth = 300.f;
-    static short checkFlags = 1;
-    static int checkFlags2 = 1;
-    static int checkFlags3 = 0;
-    static std::array<char, 512> buf;
-    static std::string resizableBuf;
-    static size_t resizableBufSizeCb = 0;
-    static bool animate = true;
-    static int vec[3] = { 1, 2, 3 };
     float ww = animate ? (sin(frameId / 30.f) * 100.f + windowWidth) : 300.f;
 
     NGui::Window.SizeConstraints([&](ImGuiSizeCallbackData* data) {
@@ -107,5 +110,15 @@ void Demo(size_t frameId)
         NGui::CollapsingHeader("Collapsing", [] {
             NGui::Text("Collapsed");
             });
+
+        NGui::Input("Validated float", validated);
+        NGui::Drag("Validated float drag", validated);
+        NGui::Slider("Validated float slide", validated, 0.f, 100.f);
+
+        NGui::Text({ "Validated value = {}", validated });
+
+        NGui::TextBox("Validated string", validatedString);
+
+        NGui::Text({ "Validated string = {}", validatedString });
     });
 }

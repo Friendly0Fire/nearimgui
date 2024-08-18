@@ -7,6 +7,7 @@
 #include <variant>
 #include <span>
 #include <utility>
+#include <functional>
 #include <misc/cpp/imgui_stdlib.h>
 
 namespace NGui
@@ -95,6 +96,38 @@ namespace NGui
         return a;
     }
 
+    template<typename T, typename F = std::function<bool(T)>> requires std::convertible_to<std::invoke_result_t<F, const T&>, bool>
+    class Validated
+    {
+        T value_{};
+        T cached_{};
+        F validator_ = [](T) { return true; };
+
+    public:
+        using Type = T;
+        using Validator = F;
+
+        Validated(T&& initialValue, F&& validator)
+            : value_(std::move(initialValue)), cached_(value_), validator_(std::move(validator)) {}
+
+        Validated(F&& validator)
+            : validator_(std::move(validator)) {}
+
+        Validated() {}
+
+        const T& get() const { return cached_; }
+        operator const T&() const { return get(); }
+        T& ref() { return value_; }
+
+        bool update(bool changed)
+        {
+            if (changed && validator_(value_))
+                cached_ = value_;
+
+            return changed;
+        }
+    };
+
     static constexpr struct AutoFitT
     {
         static constexpr float value = 0.f;
@@ -108,7 +141,13 @@ namespace NGui
     namespace Detail
     {
         template<typename T>
+        concept IsValidated = std::same_as<T, Validated<typename T::Type, typename T::Validator>>;
+
+        template<typename T>
         concept Numeric = std::integral<T> || std::floating_point<T>;
+
+        template<typename T>
+        concept IsValidatedNumber = IsValidated<T> && Numeric<typename T::Type>;
 
         template<class... Ts>
         struct Overloaded : Ts... { using Ts::operator()...; };
@@ -372,7 +411,7 @@ namespace NGui
             }
             else if constexpr (std::is_floating_point_v<Type>)
                 return sizeof(Type) == 4 ? ImGuiDataType_Float : ImGuiDataType_Double;
-            
+
             return ImGuiDataType_COUNT;
         }
 
@@ -768,10 +807,16 @@ namespace NGui
             ImGuiSliderFlags_ flags = ImGuiSliderFlags_None;
         };
 
-        template<typename T>
+        template<Detail::Numeric T>
         bool operator()(FormatArgs fmt, T& value, const T& min, const T& max) const
         {
             return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool operator()(FormatArgs fmt, T& value, const typename T::Type& min, const typename T::Type& max) const
+        {
+            return value.update(operator()(fmt, value.ref(), min, max));
         }
 
         template<typename T>
@@ -780,9 +825,21 @@ namespace NGui
             return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), Detail::Enum(params.flags));
         }
 
-        bool Angle(FormatArgs fmt, float& value)
+        template<Detail::IsValidatedNumber T>
+        bool operator()(FormatArgs fmt, T& value, const typename T::Type& min, const typename T::Type& max, Params&& params) const
+        {
+            return value.update(operator()(fmt, value.ref(), min, max, std::move(params)));
+        }
+
+        bool Angle(FormatArgs fmt, float& value) const
         {
             return ImGui::SliderAngle(fmt.GetValue(), &value);
+        }
+
+        template<typename F>
+        bool Angle(FormatArgs fmt, Validated<float, F>& value) const
+        {
+            return value.update(Angle(fmt, value.ref()));
         }
 
         struct AngleParams : Params
@@ -809,19 +866,31 @@ namespace NGui
             ImGuiSliderFlags_ flags = ImGuiSliderFlags_None;
         };
 
-        template<typename T>
+        template<Detail::Numeric T>
         bool operator()(FormatArgs fmt, T& value) const
         {
             return ImGui::DragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value);
         }
 
-        template<typename T>
+        template<Detail::IsValidatedNumber T>
+        bool operator()(FormatArgs fmt, T& value) const
+        {
+            return value.update(operator()(fmt, value.ref()));
+        }
+
+        template<Detail::Numeric T>
         bool operator()(FormatArgs fmt, T& value, Params<T>&& params) const
         {
             return ImGui::DragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, params.speed,
                 params.min ? &*params.min : nullptr,
                 params.max ? &*params.max : nullptr,
                 params.format.GetValue(), params.flags);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool operator()(FormatArgs fmt, T& value, Params<typename T::Type>&& params) const
+        {
+            return value.update(operator()(fmt, value.ref(), std::move(params)));
         }
 
         template<typename T>
@@ -924,6 +993,12 @@ namespace NGui
             return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, str.data(), static_cast<int>(str.capacity() + 1), params.size ? *params.size : ImVec2(0, 0), params.flags, StringResizeCallback, &wrapData);
         }
 
+        template<typename F>
+        bool operator()(FormatArgs fmt, Validated<std::string, F>& str, Params&& params = {}) const
+        {
+            return str.update(operator()(fmt, str.ref(), std::move(params)));
+        }
+
         bool operator()(FormatArgs fmt, std::string& str, std::invocable<ImGuiInputTextCallbackData*> auto&& callback, Params&& params = {}) const
         {
             params.flags |= ImGuiInputTextFlags_CallbackResize;
@@ -933,6 +1008,13 @@ namespace NGui
             StringResizeCallbackData wrapData{ str, cb, data.get() };
             return ImGui::InputTextEx(fmt.GetValue(), params.hint ? params.hint->GetValue() : nullptr, str.data(), static_cast<int>(str.capacity() + 1), params.size ? *params.size : ImVec2(0, 0), params.flags, StringResizeCallback, &wrapData);
         }
+
+        template<typename F>
+        bool operator()(FormatArgs fmt, Validated<std::string, F>& str, std::invocable<ImGuiInputTextCallbackData*> auto&& callback, Params&& params = {}) const
+        {
+            return str.update(operator()(fmt, str.ref(), std::move(callback), std::move(params)));
+        }
+
     } TextBox;
 
     static constexpr struct InputT : public Detail::BaseItem<InputT>
@@ -962,6 +1044,12 @@ namespace NGui
                 params.stepFast ? &*params.stepFast : nullptr,
                 params.format.GetValue(),
                 params.flags);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool operator()(FormatArgs fmt, T& value, TypedParams<typename T::Type>&& params = {}) const
+        {
+            return value.update(operator()(fmt, value.ref(), std::move(params)));
         }
 
         template<typename T> requires Detail::Numeric<SpanConvertibleValueType<T>>
@@ -1044,3 +1132,13 @@ namespace NGui
         }
     } CollapsingHeader;
 }
+
+template<typename T, typename F>
+struct std::formatter<NGui::Validated<T, F>> : std::formatter<T>
+{
+    template<class FmtContext>
+    auto format(NGui::Validated<T, F> v, FmtContext& ctx) const
+    {
+        return std::formatter<T>::format(v.get(), ctx);
+    }
+};
