@@ -3,6 +3,7 @@
 #include <array>
 
 ImFont* fontBig = nullptr;
+ImFont* fontSmall = nullptr;
 
 void Setup()
 {
@@ -10,6 +11,8 @@ void Setup()
     ImGui::GetIO().Fonts->AddFontDefault(&cfg);
     cfg.SizePixels = 40.f;
     fontBig = ImGui::GetIO().Fonts->AddFontDefault(&cfg);
+    cfg.SizePixels = 10.f;
+    fontSmall = ImGui::GetIO().Fonts->AddFontDefault(&cfg);
 }
 
 float f = 0.0f;
@@ -46,6 +49,11 @@ void Demo(size_t frameId)
             NGui::Drag("int", i, { .min = 1, .max = 10 });
             NGui::Drag("float range", f1, f2);
             NGui::Drag[80.f]("window width", windowWidth);
+        });
+
+        static const auto tup = std::make_tuple(NGui::Style::Alpha{ 0.5f }, NGui::Style::ItemSpacing::Y{ 30.f }, NGui::Style::FramePadding{ 2.f, 2.f }, NGui::Color::Text{ 0xFFFF00FF }, fontSmall);
+        NGui::Style(tup, [&] {
+            NGui::Text("This is wrapped in a tuple");
         });
 
         if (NGui::Button({ "Button {}", counter }))                            // Buttons return true when clicked (most widgets return true when edited/activated)

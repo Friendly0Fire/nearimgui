@@ -761,6 +761,14 @@ namespace NGui
             ImGui::PushFont(f);
         }
 
+        template<typename ...Types>
+        void Push(const std::tuple<Types...>& tup, State& s) const
+        {
+            [&]<std::size_t ...I>(std::index_sequence<I...>) {
+                (Push(std::get<I>(tup), s), ...);
+            }(std::make_index_sequence<std::tuple_size_v<std::tuple<Types...>>>());
+        }
+
         void Push(std::invocable auto&& body, const State&) const
         {
             body();
