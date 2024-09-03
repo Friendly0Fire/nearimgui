@@ -41,7 +41,7 @@ void Demo(size_t frameId)
         NGui::Checkbox("Animate window size", animate);
         NGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
 
-        NGui::Style(ImGuiCol_Text, 0xFF0000FF, ImGuiStyleVar_Alpha, 0.2f, ImGuiStyleVar_ItemSpacing, ImVec2(30.f, 30.f), fontBig, [&] {
+        NGui::Style(ImGuiCol_Text, 0xFF0000FF, ImGuiStyleVar_Alpha, 0.2f, ImGuiStyleVar_ItemSpacing, ImVec2(30.f, 30.f), NGui::StyleVarX(ImGuiStyleVar_ItemInnerSpacing), 20.f, ImGuiItemFlags_NoNav, true, fontBig, [&] {
             NGui::Slider("float", f, 0.0f, 1.0f, { .flags = ImGuiSliderFlags_AlwaysClamp });            // Edit 1 float using a slider from 0.0f to 1.0f
             NGui::Drag("int", i, { .min = 1, .max = 10 });
             NGui::Drag("float range", f1, f2);
@@ -121,4 +121,6 @@ void Demo(size_t frameId)
 
         NGui::Text({ "Validated string = {}", validatedString });
     });
+
+    ImGui::ShowDemoWindow();
 }

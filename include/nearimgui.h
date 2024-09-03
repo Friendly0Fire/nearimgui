@@ -564,6 +564,31 @@ namespace NGui
             InvokeBlock<ImGui::BeginChild, ImGui::EndChild, true>(name, std::forward<decltype(body)>(body), params.size, params.border, Detail::Enum(params.flags));
         }
     } Region;
+
+    struct StyleVarX
+    {
+        ImGuiStyleVar_ v;
+    };
+
+    struct StyleVarY
+    {
+        ImGuiStyleVar_ v;
+    };
+
+    namespace Detail
+    {
+        template<typename I, typename V>
+        concept IsStyleCol = std::same_as<std::decay_t<I>, ImGuiCol_> && (std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>);
+
+        template<typename I, typename V>
+        concept IsStyleVarXY = (std::same_as<std::decay_t<I>, StyleVarX> || std::same_as<std::decay_t<I>, StyleVarY>) && std::same_as<std::decay_t<V>, float>;
+
+        template<typename I, typename V>
+        concept IsStyleVar = IsStyleVarXY<I, V> || std::same_as<std::decay_t<I>, ImGuiStyleVar_> && (std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>);
+
+        template<typename I, typename V>
+        concept IsItemFlag = std::same_as<std::decay_t<I>, ImGuiItemFlags_>&& std::same_as<std::decay_t<V>, bool>;
+    }
     
     static constexpr class StyleT : protected Detail::InvokeBase
     {
@@ -571,17 +596,19 @@ namespace NGui
         template<typename... Args> requires (sizeof...(Args) > 1)
             void operator()(Args&& ...args) const
         {
-            Item(0, 0, std::forward<Args>(args)...);
+            Item(0, 0, 0, std::forward<Args>(args)...);
         }
 
     private:
         template<typename I, typename V, typename... Args> requires (sizeof...(Args) > 0
-            && ((std::same_as<std::decay_t<I>, ImGuiCol_> && (std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>))
-                || (std::same_as<std::decay_t<I>, ImGuiStyleVar_> && (std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>))))
-            void Item(int c, int s, I idx, const V& val, Args&& ...args) const
+            && (Detail::IsStyleCol<I, V> || Detail::IsStyleVar<I, V>) || Detail::IsItemFlag<I, V>)
+        void Item(int c, int s, int f, I idx, const V& val, Args&& ...args) const
         {
             constexpr bool isColor = std::same_as<std::decay_t<I>, ImGuiCol_>;
             constexpr bool isVar = std::same_as<std::decay_t<I>, ImGuiStyleVar_>;
+            constexpr bool isVarX = std::same_as<std::decay_t<I>, StyleVarX>;
+            constexpr bool isVarY = std::same_as<std::decay_t<I>, StyleVarY>;
+            constexpr bool isFlags = std::same_as<std::decay_t<I>, ImGuiItemFlags_>;
             if constexpr (isColor)
             {
                 ImGui::PushStyleColor(idx, val);
@@ -592,26 +619,42 @@ namespace NGui
                 ImGui::PushStyleVar(idx, val);
                 ++s;
             }
+            else if constexpr (isVarX)
+            {
+                ImGui::PushStyleVarX(idx.v, val);
+                ++s;
+            }
+            else if constexpr (isVarY)
+            {
+                ImGui::PushStyleVarY(idx.v, val);
+                ++s;
+            }
+            else if constexpr (isFlags)
+            {
+                ImGui::PushItemFlag(idx, val);
+                ++f;
+            }
 
-            Item(c, s, std::forward<Args>(args)...);
+            Item(c, s, f, std::forward<Args>(args)...);
         }
 
         template<typename... Args> requires (sizeof...(Args) > 0)
-            void Item(int c, int s, ImFont* font, Args&& ...args) const
+            void Item(int c, int s, int f, ImFont* font, Args&& ...args) const
         {
             ImGui::PushFont(font);
 
-            Item(c, s, std::forward<Args>(args)...);
+            Item(c, s, f, std::forward<Args>(args)...);
 
             ImGui::PopFont();
         }
 
-        void Item(int c, int s, auto&& body) const
+        void Item(int c, int s, int f, auto&& body) const
         {
             body();
 
             if (c > 0) ImGui::PopStyleColor(c);
             if (s > 0) ImGui::PopStyleVar(s);
+            while (f-- > 0) ImGui::PopItemFlag();
         }
 
     } Style;
