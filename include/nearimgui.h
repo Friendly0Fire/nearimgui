@@ -575,37 +575,158 @@ namespace NGui
         ImGuiStyleVar_ v;
     };
 
-    namespace Detail
+    struct Color
     {
-        template<typename I, typename V>
-        concept IsStyleCol = std::same_as<std::decay_t<I>, ImGuiCol_> && (std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>);
+    private:
+        struct BaseCol
+        {
+            ImVec4 col;
 
-        template<typename I, typename V>
-        concept IsStyleVarXY = (std::same_as<std::decay_t<I>, StyleVarX> || std::same_as<std::decay_t<I>, StyleVarY>) && std::same_as<std::decay_t<V>, float>;
+            BaseCol(const ImVec4& col) : col(col) {}
+            BaseCol(ImU32 col) : col(ImGui::ColorConvertU32ToFloat4(col)) {}
 
-        template<typename I, typename V>
-        concept IsStyleVar = IsStyleVarXY<I, V> || std::same_as<std::decay_t<I>, ImGuiStyleVar_> && (std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>);
+            friend class Style;
+        };
 
-        template<typename I, typename V>
-        concept IsItemFlag = std::same_as<std::decay_t<I>, ImGuiItemFlags_>&& std::same_as<std::decay_t<V>, bool>;
-    }
+    public:
+#define NGUI_DECLARE_STYLE_COL(Name_) struct Name_ : BaseCol { private: static constexpr ImGuiCol_ NGuiCol = ImGuiCol_##Name_; friend class Style; }
 
-    template<typename V> requires std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>
-    struct Var
-    {
-        ImGuiStyleVar_ var;
-        V val;
-    };
+        NGUI_DECLARE_STYLE_COL(Text);
+        NGUI_DECLARE_STYLE_COL(TextDisabled);
+        NGUI_DECLARE_STYLE_COL(WindowBg);              // Background of normal windows
+        NGUI_DECLARE_STYLE_COL(ChildBg);               // Background of child windows
+        NGUI_DECLARE_STYLE_COL(PopupBg);               // Background of popups, menus, tooltips windows
+        NGUI_DECLARE_STYLE_COL(Border);
+        NGUI_DECLARE_STYLE_COL(BorderShadow);
+        NGUI_DECLARE_STYLE_COL(FrameBg);               // Background of checkbox, radio button, plot, slider, text input
+        NGUI_DECLARE_STYLE_COL(FrameBgHovered);
+        NGUI_DECLARE_STYLE_COL(FrameBgActive);
+        NGUI_DECLARE_STYLE_COL(TitleBg);               // Title bar
+        NGUI_DECLARE_STYLE_COL(TitleBgActive);         // Title bar when focused
+        NGUI_DECLARE_STYLE_COL(TitleBgCollapsed);      // Title bar when collapsed
+        NGUI_DECLARE_STYLE_COL(MenuBarBg);
+        NGUI_DECLARE_STYLE_COL(ScrollbarBg);
+        NGUI_DECLARE_STYLE_COL(ScrollbarGrab);
+        NGUI_DECLARE_STYLE_COL(ScrollbarGrabHovered);
+        NGUI_DECLARE_STYLE_COL(ScrollbarGrabActive);
+        NGUI_DECLARE_STYLE_COL(CheckMark);             // Checkbox tick and RadioButton circle
+        NGUI_DECLARE_STYLE_COL(SliderGrab);
+        NGUI_DECLARE_STYLE_COL(SliderGrabActive);
+        NGUI_DECLARE_STYLE_COL(Button);
+        NGUI_DECLARE_STYLE_COL(ButtonHovered);
+        NGUI_DECLARE_STYLE_COL(ButtonActive);
+        NGUI_DECLARE_STYLE_COL(Header);                // Header* colors are used for CollapsingHeader, TreeNode, Selectable, MenuItem
+        NGUI_DECLARE_STYLE_COL(HeaderHovered);
+        NGUI_DECLARE_STYLE_COL(HeaderActive);
+        NGUI_DECLARE_STYLE_COL(Separator);
+        NGUI_DECLARE_STYLE_COL(SeparatorHovered);
+        NGUI_DECLARE_STYLE_COL(SeparatorActive);
+        NGUI_DECLARE_STYLE_COL(ResizeGrip);            // Resize grip in lower-right and lower-left corners of windows.
+        NGUI_DECLARE_STYLE_COL(ResizeGripHovered);
+        NGUI_DECLARE_STYLE_COL(ResizeGripActive);
+        NGUI_DECLARE_STYLE_COL(TabHovered);            // Tab background, when hovered
+        NGUI_DECLARE_STYLE_COL(Tab);                   // Tab background, when tab-bar is focused & tab is unselected
+        NGUI_DECLARE_STYLE_COL(TabSelected);           // Tab background, when tab-bar is focused & tab is selected
+        NGUI_DECLARE_STYLE_COL(TabSelectedOverline);   // Tab horizontal overline, when tab-bar is focused & tab is selected
+        NGUI_DECLARE_STYLE_COL(TabDimmed);             // Tab background, when tab-bar is unfocused & tab is unselected
+        NGUI_DECLARE_STYLE_COL(TabDimmedSelected);     // Tab background, when tab-bar is unfocused & tab is selected
+        NGUI_DECLARE_STYLE_COL(TabDimmedSelectedOverline);//..horizontal overline, when tab-bar is unfocused & tab is selected
+        NGUI_DECLARE_STYLE_COL(DockingPreview);        // Preview overlay color when about to docking something
+        NGUI_DECLARE_STYLE_COL(DockingEmptyBg);        // Background color for empty node (e.g. CentralNode with no window docked into it)
+        NGUI_DECLARE_STYLE_COL(PlotLines);
+        NGUI_DECLARE_STYLE_COL(PlotLinesHovered);
+        NGUI_DECLARE_STYLE_COL(PlotHistogram);
+        NGUI_DECLARE_STYLE_COL(PlotHistogramHovered);
+        NGUI_DECLARE_STYLE_COL(TableHeaderBg);         // Table header background
+        NGUI_DECLARE_STYLE_COL(TableBorderStrong);     // Table outer and header borders (prefer using Alpha=1.0 here)
+        NGUI_DECLARE_STYLE_COL(TableBorderLight);      // Table inner borders (prefer using Alpha=1.0 here)
+        NGUI_DECLARE_STYLE_COL(TableRowBg);            // Table row background (even rows)
+        NGUI_DECLARE_STYLE_COL(TableRowBgAlt);         // Table row background (odd rows)
+        NGUI_DECLARE_STYLE_COL(TextLink);              // Hyperlink color
+        NGUI_DECLARE_STYLE_COL(TextSelectedBg);
+        NGUI_DECLARE_STYLE_COL(DragDropTarget);        // Rectangle highlighting a drop target
+        NGUI_DECLARE_STYLE_COL(NavHighlight);          // Gamepad/keyboard: current highlighted item
+        NGUI_DECLARE_STYLE_COL(NavWindowingHighlight); // Highlight window when using CTRL+TAB
+        NGUI_DECLARE_STYLE_COL(NavWindowingDimBg);     // Darken/colorize entire screen behind the CTRL+TAB window list, when active
+        NGUI_DECLARE_STYLE_COL(ModalWindowDimBg);      // Darken/colorize entire screen behind a modal window, when one is active
 
-    template<typename V> requires std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>
-    struct Col
-    {
-        ImGuiCol_ col;
-        V val;
+#undef NGUI_DECLARE_STYLE_COL
+        static_assert(ImGuiCol_COUNT == 58);
     };
     
-    static constexpr class StyleT : protected Detail::InvokeBase
+    static constexpr class Style : protected Detail::InvokeBase
     {
+    private:
+
+        template<typename T, ImGuiStyleVar_ V>
+        struct BaseVar
+        {
+            T val;
+
+            BaseVar(float val) : val(val) {}
+
+        private:
+            static constexpr ImGuiStyleVar_ NGuiStyleVar = V;
+            friend class Style;
+        };
+
+        template<ImGuiStyleVar_ V>
+        struct BaseVar<ImVec2, V>
+        {
+            ImVec2 val;
+
+            BaseVar(const ImVec2& val) : val(val) {}
+            BaseVar(float x, float y) : val(x, y) {}
+
+            struct X : BaseVar<float, V> { using BaseVar<float, V>::BaseVar; private: static constexpr bool IsX = true; friend class Style; };
+            struct Y : BaseVar<float, V> { using BaseVar<float, V>::BaseVar; private: static constexpr bool IsY = true; friend class Style; };
+
+        private:
+            static constexpr ImGuiStyleVar_ NGuiStyleVar = V;
+            friend class Style;
+        };
+
+    public:
+#define NGUI_DECLARE_STYLE_VAR(Name_) struct Name_ : BaseVar<decltype(ImGuiStyle::Name_), ImGuiStyleVar_##Name_> { using BaseVar::BaseVar; }
+
+        NGUI_DECLARE_STYLE_VAR(Alpha);
+        NGUI_DECLARE_STYLE_VAR(DisabledAlpha);
+        NGUI_DECLARE_STYLE_VAR(WindowPadding);
+        NGUI_DECLARE_STYLE_VAR(WindowRounding);
+        NGUI_DECLARE_STYLE_VAR(WindowBorderSize);
+        NGUI_DECLARE_STYLE_VAR(WindowMinSize);
+        NGUI_DECLARE_STYLE_VAR(WindowTitleAlign);
+        NGUI_DECLARE_STYLE_VAR(ChildRounding);
+        NGUI_DECLARE_STYLE_VAR(ChildBorderSize);
+        NGUI_DECLARE_STYLE_VAR(PopupRounding);
+        NGUI_DECLARE_STYLE_VAR(PopupBorderSize);
+        NGUI_DECLARE_STYLE_VAR(FramePadding);
+        NGUI_DECLARE_STYLE_VAR(FrameRounding);
+        NGUI_DECLARE_STYLE_VAR(FrameBorderSize);
+        NGUI_DECLARE_STYLE_VAR(ItemSpacing);
+        NGUI_DECLARE_STYLE_VAR(ItemInnerSpacing);
+        NGUI_DECLARE_STYLE_VAR(IndentSpacing);
+        NGUI_DECLARE_STYLE_VAR(CellPadding);
+        NGUI_DECLARE_STYLE_VAR(ScrollbarSize);
+        NGUI_DECLARE_STYLE_VAR(ScrollbarRounding);
+        NGUI_DECLARE_STYLE_VAR(GrabMinSize);
+        NGUI_DECLARE_STYLE_VAR(GrabRounding);
+        NGUI_DECLARE_STYLE_VAR(TabRounding);
+        NGUI_DECLARE_STYLE_VAR(TabBorderSize);
+        NGUI_DECLARE_STYLE_VAR(TabBarBorderSize);
+        NGUI_DECLARE_STYLE_VAR(TabBarOverlineSize);
+        NGUI_DECLARE_STYLE_VAR(TableAngledHeadersAngle);
+        NGUI_DECLARE_STYLE_VAR(TableAngledHeadersTextAlign);
+        NGUI_DECLARE_STYLE_VAR(ButtonTextAlign);
+        NGUI_DECLARE_STYLE_VAR(SelectableTextAlign);
+        NGUI_DECLARE_STYLE_VAR(SeparatorTextBorderSize);
+        NGUI_DECLARE_STYLE_VAR(SeparatorTextAlign);
+        NGUI_DECLARE_STYLE_VAR(SeparatorTextPadding);
+        NGUI_DECLARE_STYLE_VAR(DockingSeparatorSize);
+
+#undef NGUI_DECLARE_STYLE_VAR
+        static_assert(ImGuiStyleVar_COUNT == 34);
+
     private:
         struct State
         {
@@ -614,18 +735,24 @@ namespace NGui
             short f = 0;
         };
 
-        template<typename V>
-        void Push(const Var<V>& v, State& s) const
+        template<typename Var> requires requires() { { Var::NGuiStyleVar } -> std::convertible_to<ImGuiStyleVar_>; }
+        void Push(const Var& v, State& s) const
         {
             ++s.v;
-            ImGui::PushStyleVar(v.var, v.val);
+
+            if constexpr (requires() { Var::IsX; })
+                ImGui::PushStyleVarX(v.NGuiStyleVar, v.val);
+            else if constexpr (requires() { Var::IsY; })
+                ImGui::PushStyleVarY(v.NGuiStyleVar, v.val);
+            else
+                ImGui::PushStyleVar(v.NGuiStyleVar, v.val);
         }
 
-        template<typename V>
-        void Push(const Col<V>& c, State& s) const
+        template<typename Col> requires requires() { { Col::NGuiCol } -> std::convertible_to<ImGuiCol_>; }
+        void Push(const Col& c, State& s) const
         {
             ++s.c;
-            ImGui::PushStyleColor(c.col, c.val);
+            ImGui::PushStyleColor(c.NGuiCol, c.col);
         }
 
         void Push(ImFont* f, State& s) const
@@ -654,71 +781,6 @@ namespace NGui
             (Push(args, s), ...);
             Pop(s);
         }
-
-        //template<typename... Args> requires (sizeof...(Args) > 1)
-        //    void operator()(Args&& ...args) const
-        //{
-        //    Item(0, 0, 0, std::forward<Args>(args)...);
-        //}
-
-    private:
-        template<typename I, typename V, typename... Args> requires (sizeof...(Args) > 0
-            && (Detail::IsStyleCol<I, V> || Detail::IsStyleVar<I, V>) || Detail::IsItemFlag<I, V>)
-        void Item(int c, int s, int f, I idx, const V& val, Args&& ...args) const
-        {
-            constexpr bool isColor = std::same_as<std::decay_t<I>, ImGuiCol_>;
-            constexpr bool isVar = std::same_as<std::decay_t<I>, ImGuiStyleVar_>;
-            constexpr bool isVarX = std::same_as<std::decay_t<I>, StyleVarX>;
-            constexpr bool isVarY = std::same_as<std::decay_t<I>, StyleVarY>;
-            constexpr bool isFlags = std::same_as<std::decay_t<I>, ImGuiItemFlags_>;
-            if constexpr (isColor)
-            {
-                ImGui::PushStyleColor(idx, val);
-                ++c;
-            }
-            else if constexpr (isVar)
-            {
-                ImGui::PushStyleVar(idx, val);
-                ++s;
-            }
-            else if constexpr (isVarX)
-            {
-                ImGui::PushStyleVarX(idx.v, val);
-                ++s;
-            }
-            else if constexpr (isVarY)
-            {
-                ImGui::PushStyleVarY(idx.v, val);
-                ++s;
-            }
-            else if constexpr (isFlags)
-            {
-                ImGui::PushItemFlag(idx, val);
-                ++f;
-            }
-
-            Item(c, s, f, std::forward<Args>(args)...);
-        }
-
-        template<typename... Args> requires (sizeof...(Args) > 0)
-            void Item(int c, int s, int f, ImFont* font, Args&& ...args) const
-        {
-            ImGui::PushFont(font);
-
-            Item(c, s, f, std::forward<Args>(args)...);
-
-            ImGui::PopFont();
-        }
-
-        void Item(int c, int s, int f, auto&& body) const
-        {
-            body();
-
-            if (c > 0) ImGui::PopStyleColor(c);
-            if (s > 0) ImGui::PopStyleVar(s);
-            while (f-- > 0) ImGui::PopItemFlag();
-        }
-
     } Style;
 
     static constexpr class TabStopT : protected Detail::InvokeBase
@@ -795,14 +857,14 @@ namespace NGui
 
         void Colored(const ImVec4& col, FormatArgsWithEnd fmt)
         {
-            Style(Col{ ImGuiCol_Text, col },
-                [&] { operator()(std::move(fmt)); });
+            //Style(Col{ ImGuiCol_Text, col },
+            //    [&] { operator()(std::move(fmt)); });
         }
 
         void Disabled(FormatArgsWithEnd fmt)
         {
-            Style(Col{ ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] },
-                [&] { operator()(std::move(fmt)); });
+            //Style(Col{ ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] },
+            //    [&] { operator()(std::move(fmt)); });
         }
 
         void Wrapped(FormatArgsWithEnd fmt)
