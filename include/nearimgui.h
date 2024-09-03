@@ -589,15 +589,77 @@ namespace NGui
         template<typename I, typename V>
         concept IsItemFlag = std::same_as<std::decay_t<I>, ImGuiItemFlags_>&& std::same_as<std::decay_t<V>, bool>;
     }
+
+    template<typename V> requires std::same_as<std::decay_t<V>, float> || std::same_as<std::decay_t<V>, ImVec2>
+    struct Var
+    {
+        ImGuiStyleVar_ var;
+        V val;
+    };
+
+    template<typename V> requires std::same_as<std::decay_t<V>, ImU32> || std::same_as<std::decay_t<V>, ImVec4>
+    struct Col
+    {
+        ImGuiCol_ col;
+        V val;
+    };
     
     static constexpr class StyleT : protected Detail::InvokeBase
     {
+    private:
+        struct State
+        {
+            short v = 0;
+            short c = 0;
+            short f = 0;
+        };
+
+        template<typename V>
+        void Push(const Var<V>& v, State& s) const
+        {
+            ++s.v;
+            ImGui::PushStyleVar(v.var, v.val);
+        }
+
+        template<typename V>
+        void Push(const Col<V>& c, State& s) const
+        {
+            ++s.c;
+            ImGui::PushStyleColor(c.col, c.val);
+        }
+
+        void Push(ImFont* f, State& s) const
+        {
+            ++s.f;
+            ImGui::PushFont(f);
+        }
+
+        void Push(std::invocable auto&& body, const State&) const
+        {
+            body();
+        }
+
+        void Pop(State& s) const
+        {
+            if (s.v > 0) ImGui::PopStyleVar(s.v);
+            if (s.c > 0) ImGui::PopStyleColor(s.c);
+            while (s.f-- > 0) ImGui::PopFont();
+        }
+
     public:
         template<typename... Args> requires (sizeof...(Args) > 1)
             void operator()(Args&& ...args) const
         {
-            Item(0, 0, 0, std::forward<Args>(args)...);
+            State s;
+            (Push(args, s), ...);
+            Pop(s);
         }
+
+        //template<typename... Args> requires (sizeof...(Args) > 1)
+        //    void operator()(Args&& ...args) const
+        //{
+        //    Item(0, 0, 0, std::forward<Args>(args)...);
+        //}
 
     private:
         template<typename I, typename V, typename... Args> requires (sizeof...(Args) > 0
@@ -686,6 +748,15 @@ namespace NGui
         }
     } ItemWidth;
 
+    static constexpr class ItemFlagsT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(ImGuiItemFlags_ flags, bool active, auto&& body) const
+        {
+            InvokeStack<ImGui::PushItemFlag, ImGui::PopItemFlag>(std::forward<decltype(body)>(body), flags, active);
+        }
+    } ItemFlags;
+
     static constexpr class TextWrapPosT : protected Detail::InvokeBase
     {
     public:
@@ -724,13 +795,13 @@ namespace NGui
 
         void Colored(const ImVec4& col, FormatArgsWithEnd fmt)
         {
-            Style(ImGuiCol_Text, col,
+            Style(Col{ ImGuiCol_Text, col },
                 [&] { operator()(std::move(fmt)); });
         }
 
         void Disabled(FormatArgsWithEnd fmt)
         {
-            Style(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled],
+            Style(Col{ ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] },
                 [&] { operator()(std::move(fmt)); });
         }
 
