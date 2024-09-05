@@ -8,6 +8,7 @@
 #include <span>
 #include <utility>
 #include <functional>
+#include <ranges>
 #include <misc/cpp/imgui_stdlib.h>
 
 namespace NGui
@@ -149,7 +150,7 @@ namespace NGui
         template<typename T>
         concept IsValidatedNumber = IsValidated<T> && Numeric<typename T::Type>;
 
-        template<class... Ts>
+        template<typename... Ts>
         struct Overloaded : Ts... { using Ts::operator()...; };
 
         const char* CacheString(std::string_view sv);
@@ -327,6 +328,26 @@ namespace NGui
 
     namespace Detail
     {
+        inline const char* TryGetValue(const FormatArgs& fmt)
+        {
+            return fmt.GetValue();
+        }
+
+        inline const char* TryGetValue(const std::string& str)
+        {
+            return str.c_str();
+        }
+
+        inline const char* TryGetValue(std::string_view strv)
+        {
+            return Detail::CacheString(strv);
+        }
+
+        inline const char* TryGetValue(const char* cstr)
+        {
+            return cstr;
+        }
+
         template<typename E> requires std::is_enum_v<E>
         int Enum(E e)
         {
@@ -338,7 +359,7 @@ namespace NGui
         protected:
             template<auto Begin, auto End, bool AlwaysCallEnd, typename... Args>
                 requires std::invocable<decltype(Begin), const char*, Args...>
-            void InvokeBlock(auto&& body, Args&& ...args) const
+            bool InvokeBlock(auto&& body, Args&& ...args) const
             {
                 bool ret;
                 if (ret = Begin(std::forward<Args>(args)...))
@@ -346,11 +367,13 @@ namespace NGui
 
                 if (AlwaysCallEnd || ret)
                     End();
+
+                return ret;
             }
 
             template<auto Begin, auto End, bool AlwaysCallEnd, typename... Args>
                 requires std::invocable<decltype(Begin), const char*, Args...>
-            void InvokeBlock(FormatArgs name, auto&& body, Args&& ...args) const
+            bool InvokeBlock(FormatArgs name, auto&& body, Args&& ...args) const
             {
                 bool ret;
                 if (ret = Begin(name.GetValue(), std::forward<Args>(args)...))
@@ -358,6 +381,8 @@ namespace NGui
 
                 if (AlwaysCallEnd || ret)
                     End();
+
+                return ret;
             }
 
             template<auto Push, auto Pop, typename... Args>
@@ -865,14 +890,14 @@ namespace NGui
 
         void Colored(const ImVec4& col, FormatArgsWithEnd fmt)
         {
-            //Style(Col{ ImGuiCol_Text, col },
-            //    [&] { operator()(std::move(fmt)); });
+            Style(Color::Text{ col },
+                [&] { operator()(std::move(fmt)); });
         }
 
         void Disabled(FormatArgsWithEnd fmt)
         {
-            //Style(Col{ ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] },
-            //    [&] { operator()(std::move(fmt)); });
+            Style(Color::Text{ ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] },
+                [&] { operator()(std::move(fmt)); });
         }
 
         void Wrapped(FormatArgsWithEnd fmt)
@@ -909,6 +934,11 @@ namespace NGui
         bool Arrow(FormatArgs fmt, ImGuiDir dir) const
         {
             return ImGui::ArrowButton(fmt.GetValue(), dir);
+        }
+
+        bool Link(FormatArgs fmt) const
+        {
+            return ImGui::TextLink(fmt.GetValue());
         }
 
     } Button;
@@ -1004,13 +1034,13 @@ namespace NGui
         }
 
         template<typename T>
-        bool operator()(FormatArgs fmt, T& value, const T& min, const T& max, Params&& params) const
+        bool operator()(FormatArgs fmt, T& value, const T& min, const T& max, const Params& params) const
         {
             return ImGui::SliderScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), Detail::Enum(params.flags));
         }
 
         template<Detail::IsValidatedNumber T>
-        bool operator()(FormatArgs fmt, T& value, const typename T::Type& min, const typename T::Type& max, Params&& params) const
+        bool operator()(FormatArgs fmt, T& value, const typename T::Type& min, const typename T::Type& max, const Params& params) const
         {
             return value.update(operator()(fmt, value.ref(), min, max, std::move(params)));
         }
@@ -1035,6 +1065,30 @@ namespace NGui
         bool Angle(FormatArgs fmt, float& value, AngleParams&& params)
         {
             return ImGui::SliderAngle(fmt.GetValue(), &value, params.min, params.max, params.format.GetValue(), Detail::Enum(params.flags));
+        }
+
+        template<Detail::Numeric T>
+        bool Vertical(FormatArgs fmt, const ImVec2& size, T& value, const T& min, const T& max) const
+        {
+            return ImGui::VSliderScalar(fmt.GetValue(), size, Detail::GetDataType<T>(), &value, &min, &max);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool Vertical(FormatArgs fmt, const ImVec2& size, T& value, const typename T::Type& min, const typename T::Type& max) const
+        {
+            return value.update(Vertical(fmt, size, value.ref(), min, max));
+        }
+
+        template<Detail::Numeric T>
+        bool Vertical(FormatArgs fmt, const ImVec2& size, T& value, const T& min, const T& max, const Params& params) const
+        {
+            return ImGui::VSliderScalar(fmt.GetValue(), size, Detail::GetDataType<T>(), &value, &min, &max, params.format.GetValue(), Detail::Enum(params.flags));
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool Vertical(FormatArgs fmt, const ImVec2& size, T& value, const typename T::Type& min, const typename T::Type& max, const Params& params) const
+        {
+            return value.update(Vertical(fmt, size, value.ref(), min, max, params));
         }
     } Slider;
 
@@ -1315,6 +1369,72 @@ namespace NGui
             InvokeBlock<static_cast<bool(*)(const char*, ImGuiTreeNodeFlags)>(ImGui::CollapsingHeader), [] {}, false>(label, std::forward<decltype(body)>(body), params.flags);
         }
     } CollapsingHeader;
+
+    static constexpr class ProgressBarT
+    {
+        void operator()(float fraction, const ImVec2& size = ImVec2(-FLT_MIN, 0), FormatArgs overlay = nullptr)
+        {
+            ImGui::ProgressBar(fraction, size, overlay.GetValue());
+        }
+    } ProgressBar;
+
+    static constexpr class ImageT
+    {
+        struct Params
+        {
+            ImVec2 uv0 { 0, 0 };
+            ImVec2 uv1 { 1, 1 };
+            ImVec4 tintColor { 1, 1, 1, 1 };
+            ImVec4 borderColor{  0, 0, 0, 0 };
+        };
+
+        void operator()(ImTextureID textureId, const ImVec2& size, const Params& params)
+        {
+            ImGui::Image(textureId, size, params.uv0, params.uv1, params.tintColor, params.borderColor);
+        }
+
+        bool Button(FormatArgs id, ImTextureID textureId, const ImVec2& size, const Params& params)
+        {
+            return ImGui::ImageButton(id.GetValue(), textureId, size, params.uv0, params.uv1, params.tintColor, params.borderColor);
+        }
+    } Image;
+
+
+
+    static constexpr class ComboBoxT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(FormatArgs label, FormatArgs preview, ImGuiComboFlags_ flags, auto&& body) const
+        {
+            InvokeBlock<ImGui::BeginCombo, ImGui::EndCombo, false>(label, std::forward<decltype(body)>(body), preview.GetValue(), flags);
+        }
+
+        void operator()(FormatArgs label, FormatArgs preview, auto&& body) const
+        {
+            operator()(label, preview, ImGuiComboFlags_None, std::forward<decltype(body)>(body));
+        }
+
+        bool operator()(FormatArgs label, auto& index, std::ranges::random_access_range auto&& elements, ImGuiComboFlags_ flags = ImGuiComboFlags_None, ImGuiSelectableFlags_ selFlags = ImGuiSelectableFlags_None) const
+            requires std::convertible_to<decltype(index), std::iter_difference_t<std::ranges::iterator_t<decltype(elements)>>>
+        {
+            bool selected = false;
+            std::decay_t<decltype(index)> i = 0;
+            operator()(label, Detail::TryGetValue(elements[index]), [&] {
+                for (const auto& opt : elements)
+                {
+                    if (ImGui::Selectable(Detail::TryGetValue(opt), i == index, selFlags))
+                    {
+                        index = i;
+                        selected = true;
+                    }
+                    ++i;
+                }
+            });
+
+            return selected;
+        }
+
+    } ComboBox;
 }
 
 template<typename T, typename F>

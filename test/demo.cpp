@@ -31,6 +31,8 @@ bool animate = true;
 int vec[3] = { 1, 2, 3 };
 NGui::Validated validated{ 10.f, [](float v) { return v > 1.f; } };
 NGui::Validated<std::string> validatedString{ "Test", [](const std::string& v) { return v.starts_with("T"); } };
+size_t comboIndex = 0;
+std::vector<std::string> comboChoices{ { "A", "B", "C" } };
 
 void Demo(size_t frameId)
 {
@@ -122,12 +124,15 @@ void Demo(size_t frameId)
         NGui::Input("Validated float", validated);
         NGui::Drag("Validated float drag", validated);
         NGui::Slider("Validated float slide", validated, 0.f, 100.f);
+        NGui::Slider.Vertical("Vertical slider", ImVec2(20, 100), validated, 0.f, 100.f);
 
         NGui::Text({ "Validated value = {}", validated });
 
         NGui::TextBox("Validated string", validatedString);
 
         NGui::Text({ "Validated string = {}", validatedString });
+
+        NGui::ComboBox("Combo", comboIndex, comboChoices);
     });
 
     ImGui::ShowDemoWindow();
