@@ -1399,8 +1399,6 @@ namespace NGui
         }
     } Image;
 
-
-
     static constexpr class ComboBoxT : protected Detail::InvokeBase
     {
     public:
@@ -1435,6 +1433,65 @@ namespace NGui
         }
 
     } ComboBox;
+
+    template<typename T> constexpr size_t VectorLength = std::extent_v<T>;
+
+    inline float* GetPointer(float* v)
+    {
+        return v;
+    }
+    
+    template<> constexpr size_t VectorLength<ImVec2> = 2;
+    inline float* GetPointer(ImVec2& v)
+    {
+        return &v.x;
+    }
+
+    template<> constexpr size_t VectorLength<ImVec4> = 4;
+    inline float* GetPointer(ImVec4& v)
+    {
+        return &v.x;
+    }
+
+    namespace Detail
+    {
+        template<typename T, size_t N>
+        concept VectorOfLength = (VectorLength<T> == N) && requires(T t)
+        {
+            GetPointer(t);
+        };
+    }
+
+    static constexpr class ColorWidgetT
+    {
+    public:
+        template<Detail::VectorOfLength<3> T>
+        bool operator()(FormatArgs label, T& vec, ImGuiColorEditFlags_ flags = ImGuiColorEditFlags_None) const
+        {
+            return ImGui::ColorEdit3(label.GetValue(), GetPointer(vec), flags);
+        }
+        template<Detail::VectorOfLength<4> T>
+        bool operator()(FormatArgs label, T& vec, ImGuiColorEditFlags_ flags = ImGuiColorEditFlags_None) const
+        {
+            return ImGui::ColorEdit4(label.GetValue(), GetPointer(vec), flags);
+        }
+
+        template<Detail::VectorOfLength<3> T>
+        bool Picker(FormatArgs label, T& vec, ImGuiColorEditFlags_ flags = ImGuiColorEditFlags_None) const
+        {
+            return ImGui::ColorPicker3(label.GetValue(), GetPointer(vec), flags);
+        }
+        template<Detail::VectorOfLength<4> T>
+        bool Picker(FormatArgs label, T& vec, ImGuiColorEditFlags_ flags = ImGuiColorEditFlags_None) const
+        {
+            return ImGui::ColorPicker4(label.GetValue(), GetPointer(vec), flags);
+        }
+
+        bool Button(FormatArgs label, const ImVec4& col, ImGuiColorEditFlags_ flags = ImGuiColorEditFlags_None, const ImVec2& size = { 0, 0 }) const
+        {
+            return ImGui::ColorButton(label.GetValue(), col, flags, size);
+        }
+    } ColorWidget;
 }
 
 template<typename T, typename F>
