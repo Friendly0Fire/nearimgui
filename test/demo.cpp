@@ -15,6 +15,7 @@ void Setup()
     fontSmall = ImGui::GetIO().Fonts->AddFontDefault(&cfg);
 }
 
+float angularDrag = 1.f;
 float f = 0.0f;
 int i = 1;
 int counter = 0;
@@ -140,6 +141,8 @@ void Demo(size_t frameId)
         NGui::ColorWidget.Picker("Color4", f2);
 
         NGui::ColorWidget.Button("Color button", ImVec4{ 0.5f, 0.f, 0.f, 1.f });
+
+        NGui::Drag.Angular("Angular Drag", angularDrag, { .speed = 1.f, .min = 0.f, .max = 1000.f });
     });
 
     ImGui::ShowDemoWindow();

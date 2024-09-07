@@ -13,6 +13,11 @@
 
 namespace NGui
 {
+    namespace ImGuiExt
+    {
+        bool AngularDragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
+    }
+
     template<typename E> requires std::is_enum_v<E>
     constexpr bool EnableFlagOperators = false;
 
@@ -1165,6 +1170,33 @@ namespace NGui
         bool operator()(FormatArgs fmt, T& minValue, T& maxValue) const
         {
             return operator()(fmt, minValue, maxValue, ParamsRange<T>{});
+        }
+
+        template<Detail::Numeric T>
+        bool Angular(FormatArgs fmt, T& value) const
+        {
+            return ImGuiExt::AngularDragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool Angular(FormatArgs fmt, T& value) const
+        {
+            return value.update(Angular(fmt, value.ref()));
+        }
+
+        template<Detail::Numeric T>
+        bool Angular(FormatArgs fmt, T& value, Params<T>&& params) const
+        {
+            return ImGuiExt::AngularDragScalar(fmt.GetValue(), Detail::GetDataType<T>(), &value, params.speed,
+                params.min ? &*params.min : nullptr,
+                params.max ? &*params.max : nullptr,
+                params.format.GetValue(), params.flags);
+        }
+
+        template<Detail::IsValidatedNumber T>
+        bool Angular(FormatArgs fmt, T& value, Params<typename T::Type>&& params) const
+        {
+            return value.update(Angular(fmt, value.ref(), std::move(params)));
         }
     } Drag;
 
