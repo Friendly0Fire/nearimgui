@@ -319,7 +319,7 @@ namespace NGui
             : value_(val.data()), valueEnd_(val.data() + val.size()) {}
 
         FormatArgsWithEnd(const char* val)
-            : value_(val) {}
+            : value_(val), valueEnd_(val + std::strlen(val)) {}
 
         FormatArgsWithEnd(const char* val, const char* valEnd)
             : value_(val), valueEnd_(valEnd) {}
@@ -683,7 +683,7 @@ namespace NGui
 #undef NGUI_DECLARE_STYLE_COL
         static_assert(ImGuiCol_COUNT == 58);
     };
-    
+
     static constexpr class Style : protected Detail::InvokeBase
     {
     private:
@@ -918,6 +918,25 @@ namespace NGui
 
         // TODO: LabelText, SeparatorText
     } Text;
+
+    static constexpr class IDT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(FormatArgsWithEnd fmt, auto&& body) const
+        {
+            InvokeStack<static_cast<void(*)(const char*, const char*)>(ImGui::PushID), ImGui::PopID>(std::forward<decltype(body)>(body), fmt.GetValue());
+        }
+
+        void operator()(const void* id, auto&& body) const
+        {
+            InvokeStack<static_cast<void(*)(const void*)>(ImGui::PushID), ImGui::PopID>(std::forward<decltype(body)>(body), id);
+        }
+
+        void operator()(int id, auto&& body) const
+        {
+            InvokeStack<static_cast<void(*)(int)>(ImGui::PushID), ImGui::PopID>(std::forward<decltype(body)>(body), id);
+        }
+    } ID;
 
     static constexpr struct ButtonT
     {
@@ -1472,7 +1491,7 @@ namespace NGui
     {
         return v;
     }
-    
+
     template<> constexpr size_t VectorLength<ImVec2> = 2;
     inline float* GetPointer(ImVec2& v)
     {
@@ -1524,6 +1543,26 @@ namespace NGui
             return ImGui::ColorButton(label.GetValue(), col, flags, size);
         }
     } ColorWidget;
+
+    static constexpr class SelectableT
+    {
+    public:
+        struct Params
+        {
+            ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_None;
+            ImVec2 size{ 0, 0 };
+        };
+
+        bool operator()(FormatArgs label, bool selected = false, const Params& params = {}) const
+        {
+            return ImGui::Selectable(label.GetValue(), selected, params.flags, params.size);
+        }
+
+        bool operator()(FormatArgs label, bool& selected, const Params& params = {}) const
+        {
+            return ImGui::Selectable(label.GetValue(), &selected, params.flags, params.size);
+        }
+    } Selectable;
 }
 
 template<typename T, typename F>

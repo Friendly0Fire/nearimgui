@@ -135,12 +135,14 @@ void Demo(size_t frameId)
 
         NGui::ComboBox("Combo", comboIndex, comboChoices);
 
-        float f[3] = { 1.f, 0.f, 1.f };
-        NGui::ColorWidget("Color3", f);
-        ImVec4 f2{ 1.f, 0.f, 1.f, 0.5f };
-        NGui::ColorWidget.Picker("Color4", f2);
+        NGui::ID("Color stuff", [&] {
+            float f[3] = { 1.f, 0.f, 1.f };
+            NGui::ColorWidget("Color3", f);
+            ImVec4 f2{ 1.f, 0.f, 1.f, 0.5f };
+            NGui::ColorWidget.Picker("Color4", f2);
 
-        NGui::ColorWidget.Button("Color button", ImVec4{ 0.5f, 0.f, 0.f, 1.f });
+            NGui::ColorWidget.Button("Color button", ImVec4{ 0.5f, 0.f, 0.f, 1.f });
+        });
 
         NGui::Drag.Angular("Angular Drag", angularDrag, { .speed = 1.f, .min = 0.f, .max = 1000.f });
     });
