@@ -11,6 +11,8 @@
 #include <ranges>
 #include <misc/cpp/imgui_stdlib.h>
 
+#include <iostream>
+
 namespace NGui
 {
     namespace ImGuiExt
@@ -1468,7 +1470,7 @@ namespace NGui
         {
             bool selected = false;
             std::decay_t<decltype(index)> i = 0;
-            operator()(label, Detail::TryGetValue(elements[index]), [&] {
+            operator()(label, Detail::TryGetValue(elements[index]), flags, [&] {
                 for (const auto& opt : elements)
                 {
                     if (ImGui::Selectable(Detail::TryGetValue(opt), i == index, selFlags))
@@ -1563,6 +1565,105 @@ namespace NGui
             return ImGui::Selectable(label.GetValue(), &selected, params.flags, params.size);
         }
     } Selectable;
+
+    static constexpr class ListBoxT : protected Detail::InvokeBase
+    {
+    public:
+        void operator()(FormatArgs label, const ImVec2& size, auto&& body) const
+        {
+            InvokeBlock<ImGui::BeginListBox, ImGui::EndListBox, false>(label, std::forward<decltype(body)>(body), size);
+        }
+
+        void operator()(FormatArgs label, auto&& body) const
+        {
+            InvokeBlock<ImGui::BeginListBox, ImGui::EndListBox, false>(label, std::forward<decltype(body)>(body), ImVec2(0, 0));
+        }
+
+        bool operator()(FormatArgs label, auto& index, std::ranges::random_access_range auto&& elements, ImGuiSelectableFlags_ selFlags = ImGuiSelectableFlags_None) const
+            requires std::convertible_to<decltype(index), std::iter_difference_t<std::ranges::iterator_t<decltype(elements)>>>
+        {
+            bool selected = false;
+            std::decay_t<decltype(index)> i = 0;
+            operator()(label, [&] {
+                for (const auto& opt : elements)
+                {
+                    if (ImGui::Selectable(Detail::TryGetValue(opt), i == index, selFlags))
+                    {
+                        index = i;
+                        selected = true;
+                    }
+                    ++i;
+                }
+                });
+
+            return selected;
+        }
+
+    } ListBox;
+
+    struct Menu
+    {
+        void SubMenu(FormatArgs name, bool enabled, auto&& body) const
+        {
+            if (ImGui::BeginMenu(name.GetValue(), enabled))
+            {
+                body(*this);
+                ImGui::EndMenu();
+            }
+        }
+
+        void SubMenu(FormatArgs name, auto&& body) const
+        {
+            SubMenu(name, true, std::forward<decltype(body)>(body));
+        }
+
+        struct ItemParams
+        {
+            const char* shortcut = nullptr;
+            bool selected = false;
+            bool enabled = true;
+        };
+
+        bool Item(FormatArgs name, const ItemParams& params = {}) const
+        {
+            return ImGui::MenuItem(name.GetValue(), params.shortcut, params.selected, params.enabled);
+        }
+
+    private:
+        Menu() = default;
+
+        template<auto Begin, auto End>
+        friend class MenuBarT;
+    };
+
+    template<auto Begin, auto End>
+    class MenuBarT : protected Detail::InvokeBase
+    {
+    public:
+        const MenuBarT& Menu(FormatArgs name, bool enabled, auto&& body) const
+        {
+            if (Begin())
+            {
+                if (ImGui::BeginMenu(name.GetValue(), enabled))
+                {
+                    body(NGui::Menu {});
+                    ImGui::EndMenu();
+                }
+
+                End();
+            }
+
+            return *this;
+        }
+
+        const MenuBarT& Menu(FormatArgs name, auto&& body) const
+        {
+            return Menu(name, true, std::forward<decltype(body)>(body));
+        }
+    };
+
+    static constexpr MenuBarT<ImGui::BeginMainMenuBar, ImGui::EndMainMenuBar> MainMenuBar;
+    static constexpr MenuBarT<ImGui::BeginMenuBar, ImGui::EndMenuBar> WindowMenuBar;
 }
 
 template<typename T, typename F>

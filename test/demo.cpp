@@ -1,6 +1,7 @@
 #include <imgui.h>
 #include <nearimgui.h>
 #include <array>
+#include <iostream>
 
 ImFont* fontBig = nullptr;
 ImFont* fontSmall = nullptr;
@@ -145,6 +146,25 @@ void Demo(size_t frameId)
         });
 
         NGui::Drag.Angular("Angular Drag", angularDrag, { .speed = 1.f, .min = 0.f, .max = 1000.f });
+
+        NGui::ListBox("ListBox", comboIndex, comboChoices);
+
+        NGui::MainMenuBar
+            .Menu("File", [](const NGui::Menu& m) {
+                if (m.Item("Open..."))
+                    std::cout << "Opening..." << std::endl;
+                if (m.Item("Save..."))
+                    std::cout << "Saving..." << std::endl;
+
+                m.SubMenu("Special", [](const NGui::Menu& m) {
+                    m.Item("A");
+                    m.Item("B");
+                    });
+            })
+            .Menu("Help", [](const NGui::Menu& m) {
+                if(m.Item("About"))
+                    std::cout << "About..." << std::endl;
+            });
     });
 
     ImGui::ShowDemoWindow();
